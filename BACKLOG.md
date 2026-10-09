@@ -16,14 +16,13 @@
 
 ## P1 — improve current MVP
 
-4. **Detect installed MCP hosts and connect from the dashboard.** Next product
-   slice: list available Codex, Claude and OpenCode hosts and add a direct Connect
-   action. The requested "Cloud" target was clarified as Claude. Use documented
-   host configuration formats;
-   detecting an application is not proof of MCP compatibility. Preserve existing
-   servers/settings, create a recoverable backup and avoid secrets in config/logs.
-   Done: each supported host has installation detection, connection setup,
-   explicit status/restart guidance, and a real list/call acceptance test.
+4. **Finish host runtime proof and broaden deliberate support.** Delivered:
+   detection/direct setup for Codex, Claude Code, public-API Claude Desktop and
+   OpenCode 1.x; guarded backups and credential references; actual Codex list/call
+   plus Claude Code/OpenCode connected status. Remaining: Desktop runtime and
+   private credentials, actual Claude Code/OpenCode tool calls, CI coverage for
+   the installed-host gate and Windows/Linux acceptance. Verify OpenCode 2.x before
+   adding its different format. Detecting/configuring a host is not runtime proof.
 5. **Better structural OpenAPI diagnostics.** Provide safe pointer/error summaries
    without printing request examples or secret values. Done: malformed info,
    references and path definitions identify locations in regression tests.

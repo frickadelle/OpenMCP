@@ -6,6 +6,7 @@ import { catalogSource, compileProject, suggestedName } from './importer.js';
 import { readDocument, saveConfig } from './config.js';
 import { assert, UserError } from './errors.js';
 import { banner, ribbon, busy, chapter, explain, revealTools } from './ui.js';
+import { inspectHosts, connectHost } from './hosts.js';
 
 export function projectFileForName(directory, name) {
   assert(/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(name), 'Enter a short name, e.g. my-api.');
@@ -247,12 +248,33 @@ export async function finishOnboarding(result, dashboard = false) {
   if (!result.simple) return;
   const choice = await select({ message: 'What next?', choices: [
     { name: dashboard ? 'Back to MCP overview' : 'Done', value: 'done' },
+    { name: 'Connect to Codex, Claude or OpenCode', value: 'connect' },
     { name: 'Show me how to connect my client', value: 'client' }
   ] });
+  if (choice === 'connect') {
+    const connected = await connectWizard(result.path, result.config);
+    if (connected) await input({ message: dashboard ? 'Press Enter to return to the MCP overview' : 'Press Enter to finish' });
+  }
   if (choice === 'client') {
     showConnectionSteps(result.config, result.path);
     await input({ message: dashboard ? 'Press Enter to return to the MCP overview' : 'Press Enter to finish the guide' });
   }
+}
+export async function connectWizard(configPath, config) {
+  const hosts = await inspectHosts(configPath, config);
+  const host = await select({ message: 'Connect to a client', choices: [
+    ...hosts.map(host => ({ name: `${host.name} - ${host.status}`, value: host,
+      disabled: !host.installed || Boolean(host.error) || host.status === 'Name conflict' })),
+    { name: 'Back', value: undefined }
+  ] });
+  if (!host) return;
+  const result = await connectHost(host, configPath);
+  process.stderr.write(`\n  Configured for ${host.name}: ${result.name}\n  Restart ${host.name} to load your tools.\n`);
+  if (result.backup) process.stderr.write(`  Previous settings saved to ${result.backup}\n`);
+  const envs = [...new Set(config.sources.filter(s => s.auth.type !== 'none').map(s => s.auth.env))];
+  if (envs.length) process.stderr.write(`  Required in the host environment: ${envs.join(', ')}\n`);
+  process.stderr.write('\n');
+  return result;
 }
 export function showConnectionSteps(config, configPath) {
   const command = `node ${shellQuote(fileURLToPath(new URL('./cli.js', import.meta.url)))}`;

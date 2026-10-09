@@ -23,6 +23,7 @@ Focused checks:
 ```sh
 node --test test/mapping.test.js test/config-import.test.js
 npm run test:client
+npm run test:hosts:installed # optional; installed Codex CLI required, isolated profiles
 node src/cli.js validate --strict -c examples/openapi.config.yaml
 node src/cli.js validate --strict -c examples/manual.config.yaml
 ```

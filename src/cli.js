@@ -6,7 +6,8 @@ import { runWorkbench } from './workbench.js';
 import { loadConfig, saveConfig, validateConfig } from './config.js';
 import { compileProject } from './importer.js';
 import { tour } from './tour.js';
-import { initialize, addSource, selectTools, finishOnboarding } from './wizard.js';
+import { initialize, addSource, selectTools, finishOnboarding, connectWizard } from './wizard.js';
+import { inspectHosts, connectHost } from './hosts.js';
 import { serve } from './server.js';
 import { exportClient, diagnose } from './client.js';
 import { busy, ribbon } from './ui.js';
@@ -79,6 +80,22 @@ configOption(program.command('validate').description('Validate configuration, Op
 configOption(program.command('serve').description('Run MCP over stdio (stdout is protocol only)')).action(async options => {
   const { config, directory } = await loadConfig(options.config); await serve(config, directory);
 });
+configOption(program.command('connect').description('Detect local MCP hosts and configure the selected client'))
+  .option('--list', 'List detected hosts and configuration status without changing files')
+  .option('--host <id>', 'Configure codex, claude-code, claude-desktop or opencode')
+  .action(async options => {
+    const { config, path } = await loadConfig(options.config);
+    const hosts = await inspectHosts(path, config);
+    if (options.list) { for (const host of hosts) console.log(`${host.id}: ${host.status}${host.error ? ` - ${host.error}` : ''}`); return; }
+    if (!options.host) { await connectWizard(path, config); return; }
+    const host = hosts.find(h => h.id === options.host);
+    assert(host, 'Unknown host. Use connect --list to see supported hosts.');
+    const result = await connectHost(host, path);
+    console.log(`Configured ${result.name} for ${host.name}. Restart the host to load tools.`);
+    if (result.backup) console.log(`Backup: ${result.backup}`);
+    const envs = [...new Set(config.sources.filter(s => s.auth.type !== 'none').map(s => s.auth.env))];
+    if (envs.length) console.log(`Required in the host environment: ${envs.join(', ')}.`);
+  });
 configOption(program.command('doctor').description('Check credentials and a real local MCP connection'))
   .option('--probe <tool>', 'Also call a selected GET/HEAD tool against the API').option('--args <json>', 'Probe tool arguments', '{}')
   .action(async options => {

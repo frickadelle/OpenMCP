@@ -2,6 +2,9 @@ import terminalKit from 'terminal-kit';
 import { resolve } from 'node:path';
 import { readProjects, sourceRows, toolsFor, toggleTool, updateSettings } from './workbench-store.js';
 import { assert, redact, UserError } from './errors.js';
+import { inspectHosts, connectHost } from './hosts.js';
+import { diagnose } from './client.js';
+import { compileProject } from './importer.js';
 
 const clean = value => String(value ?? '').replace(/[\x00-\x1f\x7f-\x9f]/g, ' ').trim();
 const colors = { ink: 'default', muted: 'gray', accent: 'cyan', on: 'green', error: 'red' };
@@ -27,7 +30,7 @@ export function openToolPane(state) {
 export function selectMcp(state, index) {
   const next = Math.max(0, Math.min(state.rows.length - 1, index));
   if (!state.rows.length || next === state.row) return false;
-  state.row = next; state.tool = 0; state.progress = state.motion && !state.rows[next].action ? 0 : 1;
+  state.buildStarted = undefined; state.row = next; state.tool = 0; state.progress = state.motion && !state.rows[next].action ? 0 : 1;
   return true;
 }
 export function moveSelection(state, direction) {
@@ -61,9 +64,10 @@ export function listMouse(state, name, data, width, height) {
   }
   return changed;
 }
-export function advanceBuild(state) {
+export function advanceBuild(state, now = performance.now()) {
   if (!state.motion || state.quit || state.mode !== 'browse' || state.progress >= 1) return false;
-  state.progress = Math.min(1, state.progress + 0.12);
+  state.buildStarted ??= now - state.progress * 360;
+  state.progress = Math.min(1, Math.max(state.progress, (now - state.buildStarted) / 360));
   return true;
 }
 const active = state => {
@@ -114,12 +118,17 @@ export function frameLines(state, width, height) {
   const box = (x, y, w, h, label = '', color = colors.muted, reveal = 1) => {
     const caption = label ? ` ${clean(label).slice(0, w - 6)} ` : '';
     const top = `+${caption}${'-'.repeat(w - caption.length - 2)}+`;
-    put(x, y, top.slice(0, Math.ceil(w * Math.min(1, reveal * 3))), color, w);
-    const sides = Math.ceil((h - 2) * Math.max(0, Math.min(1, reveal * 3 - 1)));
-    for (let dy = 1; dy <= sides; dy++) {
-      put(x, y + dy, '|', color, 1); put(x + w - 1, y + dy, '|', color, 1);
+    const perimeter = 2 * w + 2 * (h - 2);
+    let remaining = Math.ceil(perimeter * reveal);
+    put(x, y, top.slice(0, Math.min(w, remaining)), color, w);
+    remaining -= w;
+    for (let dy = 1; dy < h - 1 && remaining-- > 0; dy++) put(x + w - 1, y + dy, '|', color, 1);
+    if (remaining > 0) {
+      const length = Math.min(w, remaining);
+      put(x + w - length, y + h - 1, `+${'-'.repeat(w - 2)}+`.slice(w - length), color, length);
     }
-    put(x, y + h - 1, `+${'-'.repeat(w - 2)}+`.slice(0, Math.ceil(w * Math.max(0, Math.min(1, reveal * 3 - 2)))), color, w);
+    remaining -= w;
+    for (let dy = h - 2; dy > 0 && remaining-- > 0; dy--) put(x, y + dy, '|', color, 1);
   };
   const panelWidth = width - right - 2;
   const content = right + 2;
@@ -135,11 +144,20 @@ export function frameLines(state, width, height) {
     put(6, 8 + i * 3, item.sourceId ? `API: ${item.sourceId}` : item.detail ?? '', colors.muted, left - 8);
   });
   put(4, height - 6, `${state.rows.length ? state.row + 1 : 0}/${state.rows.length} | n: new`, colors.muted, left - 6);
-  const label = state.mode === 'settings' ? 'SETTINGS' : state.mode === 'help' ? 'HELP' : 'TOOLCALLS';
+  const label = state.mode === 'connect' ? 'CONNECT' : state.mode === 'settings' ? 'SETTINGS' : state.mode === 'help' ? 'HELP' : 'TOOLCALLS';
   box(right, 5, panelWidth, height - 9, label, state.pane === 'tools' || state.mode !== 'browse' ? colors.accent : colors.muted);
-  if (state.mode === 'help') {
+  if (state.mode === 'connect') {
+    const hosts = state.hosts ?? [];
+    const count = Math.max(1, Math.floor((height - 12) / 3));
+    const first = Math.max(0, (state.host ?? 0) - count + 1);
+    hosts.slice(first, first + count).forEach((host, i) => {
+      put(content, 7 + i * 3, `${state.host === first + i ? '>' : ' '} ${host.name}`, state.host === first + i ? colors.accent : colors.ink, contentWidth);
+      put(content + 2, 8 + i * 3, host.status, host.error ? colors.error : colors.muted, contentWidth - 2);
+    });
+    put(content, height - 6, 'Enter: configure | t: test server | Esc: back', colors.muted, contentWidth);
+  } else if (state.mode === 'help') {
     const help = ['A tool call is an API action.', 'Up/Down / j,k: move selection', 'Enter / Right: open tools or setup', 'Tab: switch pane. Left: MCP list',
-      'Space: toggle and save', 's: Settings   r: reload', 'n: New MCP  d: demo  q: quit dialog', 'Esc: back / cancel',
+      'Space: toggle and save', 's: Settings   c: Connect   r: reload', 'n: New MCP  d: demo  q: quit dialog', 'Esc: back / cancel',
       'Browsing never calls the API.', 'Reconnect clients after changes.'];
     const first = Math.max(0, Math.min(state.helpRow ?? 0, Math.max(0, help.length - (height - 13))));
     help.slice(first, first + height - 13).forEach((line, i) => put(content, 7 + i, line, colors.ink, contentWidth));
@@ -170,8 +188,9 @@ export function frameLines(state, width, height) {
       const count = Math.max(1, Math.floor((height - 12) / 6));
       const first = Math.max(0, state.tool - count + 1);
       tools.slice(first, first + count).forEach((tool, i) => {
-        const delay = Math.min(0.45, i * 0.07);
-        const reveal = Math.max(0, Math.min(1, (state.progress - delay) / (1 - delay)));
+        const delay = Math.min(0.2, i * 0.04);
+        const phase = Math.max(0, Math.min(1, (state.progress - delay) / (1 - delay)));
+        const reveal = 1 - (1 - phase) ** 3;
         if (!reveal) return;
         const x = content; const w = contentWidth;
         const y = 7 + i * 6;
@@ -179,12 +198,13 @@ export function frameLines(state, width, height) {
         const status = tool.error ? '[ ! ]' : tool.enabled ? '[ ON ]' : '[OFF ]';
         const border = tool.error ? colors.error : focused ? colors.accent : colors.muted;
         box(x, y, w, 5, focused ? '> TOOL' : 'TOOL', border, reveal);
-        if (reveal < 1) return;
+        const contentReveal = Math.max(0, Math.min(1, (phase - 0.4) / 0.6));
+        const revealText = (x, y, text, color, max, bold = false) => put(x, y, String(text).slice(0, Math.ceil(String(text).length * contentReveal)), color, max, bold);
         const switchX = x + w - status.length - 2;
-        put(x + 2, y + 1, tool.name, focused ? colors.accent : colors.ink, Math.max(0, switchX - x - 3), focused);
-        put(switchX, y + 1, status, tool.error ? colors.error : tool.enabled ? colors.on : colors.muted, status.length, true);
-        put(x + 2, y + 2, `${tool.method} ${tool.path}`, colors.ink, w - 4);
-        put(x + 2, y + 3, tool.error ?? tool.description ?? 'API action', tool.error ? colors.error : colors.ink, w - 4);
+        revealText(x + 2, y + 1, tool.name, focused ? colors.accent : colors.ink, Math.max(0, switchX - x - 3), focused);
+        revealText(switchX, y + 1, status, tool.error ? colors.error : tool.enabled ? colors.on : colors.muted, status.length, true);
+        revealText(x + 2, y + 2, `${tool.method} ${tool.path}`, colors.ink, w - 4);
+        revealText(x + 2, y + 3, tool.error ?? tool.description ?? 'API action', tool.error ? colors.error : colors.ink, w - 4);
       });
       if (!tools.length) put(content, 7, 'No tools. [s] Settings', colors.muted, contentWidth);
       put(content, height - 6, `${tools.filter(t => t.enabled).length}/${tools.length} enabled | ${tools.length ? state.tool + 1 : 0}/${tools.length} | Space: toggle`, colors.muted, contentWidth);
@@ -195,8 +215,10 @@ export function frameLines(state, width, height) {
     put(content, height - 8, `${state.editor.value.slice(-Math.max(1, contentWidth - 1))}_`, colors.ink, contentWidth);
     put(content, height - 7, 'Enter: apply | Esc: cancel', colors.muted, contentWidth);
   }
-  put(2, height - 3, state.busy ? 'Saving and validating ...' : state.status, state.error ? colors.error : colors.muted);
-  put(2, height - 2, width >= 90 ? '[Enter] Open  [Space] Toggle  [s] Settings  [r] Reload  [n] New  [d] Demo  [?] Help  [q] Quit' : '[Tab] Pane [Enter] Open [Space] Toggle [n] [d] [s] [?] [q]', colors.accent);
+  put(2, height - 3, state.busy ? 'Working ...' : state.status, state.error ? colors.error : colors.muted);
+  const shortcuts = state.mode === 'connect' ? '[Up/Down] Host [Enter] Set up [t] Test [Esc] Back [q] Quit' :
+    width >= 90 ? '[Enter] Open [Space] Toggle [c] Connect [s] Settings [r] Reload [n] New [d] Demo [?] [q] Quit' : '[Tab] Pane [Enter] Open [Space] Toggle [c] Connect [s] [?] [q]';
+  put(2, height - 2, shortcuts, colors.accent);
   return quitOverlay(lines, state, width, height);
 }
 export async function runWorkbench({ directory = process.cwd(), configs = [], env = process.env } = {}) {
@@ -216,10 +238,11 @@ export async function runWorkbench({ directory = process.cwd(), configs = [], en
     for (const line of frameLines(state, term.width, term.height)) screen.put({ x: line.x, y: line.y, attr: { color: line.color ?? 'default', bgColor: 'default', bold: Boolean(line.bold) }, wrap: false, markup: false }, line.text);
     screen.draw({ delta: true });
     if (!timer && !state.quit && state.motion && state.mode === 'browse' && state.progress < 1) {
-      timer = setTimeout(() => { timer = undefined; if (advanceBuild(state)) render(); }, 45);
+      state.buildStarted ??= performance.now() - state.progress * 360;
+      timer = setTimeout(() => { timer = undefined; if (advanceBuild(state)) render(); }, 16);
     }
   };
-  const transition = () => { state.progress = state.motion ? 0 : 1; state.tool = 0; state.mode = 'browse'; state.form = undefined; };
+  const transition = () => { state.buildStarted = undefined; state.progress = state.motion ? 0 : 1; state.tool = 0; state.mode = 'browse'; state.form = undefined; };
   const stop = action => { if (stopped) return; stopped = true; finish(action); };
   const safeError = error => {
     const secrets = state.projects.flatMap(p => p.config?.sources.filter(s => s.auth.type !== 'none').map(s => env[s.auth.env]) ?? []);
@@ -261,6 +284,28 @@ export async function runWorkbench({ directory = process.cwd(), configs = [], en
       await save(async () => { state.projects = await readProjects(resolve(directory), configs); state.rows = menuRows(state.projects); state.row = Math.min(state.row, Math.max(0, state.rows.length - 1)); transition(); state.progress = 1; state.status = 'Project configurations reloaded.'; }); return;
     }
     if (name === 'ESCAPE') { state.mode = 'browse'; state.pane = 'mcps'; state.editor = undefined; render(); return; }
+    if (name === 'c' && project?.config) {
+      await save(async () => {
+        state.hosts = await inspectHosts(project.path, project.config, { env }); state.host = 0; state.mode = 'connect';
+        state.status = 'Choose a host and press Enter to configure it. Existing settings are kept.';
+      }); return;
+    }
+    if (state.mode === 'connect') {
+      if (name === 'UP' || name === 'k') state.host = Math.max(0, state.host - 1);
+      if (name === 'DOWN' || name === 'j') state.host = Math.min(state.hosts.length - 1, state.host + 1);
+      if (name === 'ENTER') await save(async () => {
+        const host = state.hosts[state.host]; await connectHost(host, project.path);
+        state.hosts = await inspectHosts(project.path, project.config, { env });
+        const envs = [...new Set(project.config.sources.filter(s => s.auth.type !== 'none').map(s => s.auth.env))];
+        state.status = `Configured for ${host.name}. Restart the host to load tools.${envs.length ? ` Host env: ${envs.join(', ')}.` : ''}`;
+      });
+      else if (name === 't') await save(async () => {
+        const { selected } = await compileProject(project.config, project.directory);
+        const result = await diagnose(project.config, project.path, selected, { env });
+        state.status = `Local server tested: ${result.tools.length} tools listed. Host-session connection is not probed.`;
+      });
+      render(); return;
+    }
     if (name === 's' && project?.config) {
       if (state.mode === 'settings') state.mode = 'browse';
       else { state.mode = 'settings'; state.form = formFor(project, row.sourceId, state.motion); state.field = 0; state.status = 'Enter: edit. Choose Save to persist changes.'; }

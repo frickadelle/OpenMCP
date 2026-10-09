@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased — direct host setup and smoother build
+
+- Replace coarse frame increments with a 360 ms monotonic-clock build, eased
+  perimeter drawing and progressive content reveal at a target 16 ms cadence.
+  Keep fixed positions and stop drawing after completion.
+- Add `c` / Connect to the dashboard, a post-save wizard action and the `connect`
+  CLI command for detected Codex, Claude Code, Claude Desktop and OpenCode hosts.
+- Preserve existing host servers/settings/comments, reject conflicts and invalid
+  files, and create private backups before writes. Repeated setup is idempotent.
+- Register credential variable names/references without persisting values.
+  Desktop setup is public-API-only; OpenCode setup requires a verified 1.x CLI.
+- Show configured/restart guidance and a separate local server test. Actual
+  Codex list/call and Claude Code/OpenCode connection proof are documented;
+  Desktop runtime and Claude Code/OpenCode tool-call proof remain unverified.
+
 ## Unreleased — menu navigation and quit confirmation
 
 - Label project sources as `API: name` and add selectable New MCP / Try local
