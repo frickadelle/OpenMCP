@@ -16,6 +16,7 @@
 | Auth | Source-wide bearer, API key in header or query; runtime env values | OAuth, Basic, cookies, scoped/combined security, per-operation credentials; unsupported alternatives conservatively reject the operation |
 | Responses | JSON and text, including empty/204 and application/*+json; at most 1 MiB | Binary/media outputs, streaming, output schema validation, automatic pagination; errors at call time for unsupported response types |
 | Reliability | Total timeout 1–300000 ms, default 10000; cancellation; no retries | No automatic retries for any method; no redirect following |
+| Dashboard | Local project/source discovery, persistent tool switches, source settings and session animation preference | No live request monitor, external client-config import, cross-process hot reload or global project registry |
 | MCP | Official SDK 1.32.1 stdio, list/call tools, advisory read/write annotations | Modern protocol era from SDK v2, HTTP transport, resources/prompts, OAuth, hot reload |
 | Client export | MCP Inspector 2.10.1 CLI, legacy protocol era | Desktop-client installation/testing; export contains absolute machine-specific paths and no credentials |
 

@@ -12,8 +12,8 @@ Restart the client connection after changing configuration.
 
 Use Node 22.19+ ESM JavaScript with the built-in test runner and fetch. This avoids
 a build step and allows a fresh checkout to run immediately after `npm ci`.
-Seven direct runtime dependencies each own an existing concern: SDK, OpenAPI
-validation, JSON Schema validation/formats, YAML, CLI parsing and prompts.
+Eight direct runtime dependencies each own an existing concern: SDK, OpenAPI
+validation, JSON Schema validation/formats, YAML, CLI parsing, prompts and the keyboard/screen layer for the dashboard.
 Inspector is a pinned development dependency, not part of the runtime dependency
 set. Its larger dependency tree is accepted to test an independently shipped
 client. `npm ci --omit=dev` is sufficient for serving.
@@ -90,3 +90,27 @@ Configuration/spec files and API descriptions are trusted by the developer to
 choose capabilities; upstream responses remain untrusted model content. API
 permissions must be enforced by the API. No hosted service or user identity
 layer is in the MVP.
+
+## 7. Dashboard edits the existing configuration
+
+`workbench-store.js` discovers top-level local version-1 project files, compiles
+their catalogs through the existing importer, and validates edits before atomic
+saves. A file-content fingerprint detects external edits before replacement.
+It is a stale-edit guard, not a cross-process transactional lock.
+
+`workbench.js` uses Terminal Kit's screen buffer and keyboard handling. A pure
+frame model supports animation/layout tests. The source name slides left; tool
+cards reveal and enabled cards pulse. These are view animations, not synthetic
+API calls or claimed live telemetry. Settings retain environment variable names
+only. The dashboard does not start an API or change another client's process.
+
+Tool definitions gain optional `enabled`, defaulting to true for compatibility.
+Disabled definitions retain customization but are excluded from SDK handlers.
+The CLI selection wizard shares this state; re-enabling restores names/schemas.
+Clients reconnect to load updates. The existing config remains the authority;
+there is no generated server, separate tool registry or UI database.
+
+The UI owns an alternate terminal screen and restores input mode/cursor on exit.
+New-project creation suspends the dashboard for the existing wizard and then
+reopens it. Pipelines are refused for the dashboard; explicit server/export
+commands preserve their stdout contract.

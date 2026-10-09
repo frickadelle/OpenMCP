@@ -65,6 +65,6 @@ test('CLI init/add/tool selection is explicit and invalid edits preserve configu
   const before = (await loadConfig(file)).config; assert.equal(before.sources.length, 2); assert.equal(before.tools.length, 2);
   await assert.rejects(cli(['tools', '-c', file, '--select', 'notes/notReal'])); assert.deepEqual((await loadConfig(file)).config, before);
   await cli(['tools', '-c', file, '--select', 'other/getNote']); assert.equal((await loadConfig(file)).config.tools[0].source, 'other');
-  await cli(['tools', '-c', file, '--select', '']); assert.equal((await loadConfig(file)).config.tools.length, 0);
+  await cli(['tools', '-c', file, '--select', '']); assert.equal((await loadConfig(file)).config.tools.filter(t => t.enabled !== false).length, 0);
   await assert.rejects(cli(['init', '-c', file, '--name', 'new', '--id', 'notes', '--spec', join(root, 'examples/openapi.yaml'), '--base-url', 'http://127.0.0.1:3001', '--auth', 'none', '--select', 'getNote']));
 });

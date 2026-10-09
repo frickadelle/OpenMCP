@@ -72,7 +72,7 @@ export async function selectTools(config, directory, sourceId, selectedIds) {
   } else {
     selected = await checkbox({ message: 'Welche Aktionen darf dein Client verwenden? (Leertaste markiert)', choices: available.map(o => ({
       name: `${['GET', 'HEAD', 'OPTIONS'].includes(o.method) ? '[lesen]' : '[aendern]'} ${o.operation} - ${o.description.replaceAll(/\s+/g, ' ').slice(0, 65)} (${o.method} ${o.path})`, value: o,
-      checked: config.tools.some(t => t.source === o.source.id && t.operation === o.operation)
+      checked: config.tools.some(t => t.source === o.source.id && t.operation === o.operation && t.enabled !== false)
     })) });
   }
   const previous = config.tools;
@@ -88,7 +88,11 @@ export async function selectTools(config, directory, sourceId, selectedIds) {
         tool.inputSchema = await jsonInput('Eingabeschema (Gruppen path/query/headers/body beibehalten)', tool.inputSchema ?? op.inputSchema);
       }
     }
+    tool.enabled = true;
     tools.push(tool);
+  }
+  for (const old of previous) {
+    if ((!sourceId || old.source === sourceId) && !tools.some(t => t.source === old.source && t.operation === old.operation)) tools.push({ ...old, enabled: false });
   }
   config.tools = tools;
   return config;

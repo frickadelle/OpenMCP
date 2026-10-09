@@ -4,6 +4,24 @@ Verified locally on **2026-10-09**, macOS, Node **22.23.2**, npm **10.9.8**.
 The repository is now on GitHub with private visibility. No public/npm release
 has been made.
 
+## Terminal dashboard update
+
+- `npm run check` passed. The local suite has **66 passed, 0 failed, 0 skipped**
+  tests, including local project discovery, persistent enable/disable state,
+  preservation of customized definitions after restart, stale edit protection,
+  Settings validation, layout bounds and actual SDK rejection of disabled tools.
+- A PTY session with TERM=xterm exercised the animated title/card transition,
+  switching projects/sources and keyboard panes, Space toggling, Settings timeout
+  editing/saving and `q` cleanup. Disk reads confirmed the changed switch and
+  timeout. Fixtures were temporary copies, not user project modifications.
+- `npm link --ignore-scripts` installed the local `openmcp` alias;
+  `openmcp --version` returned `0.1.0`.
+- Runtime `npm audit --omit=dev` reported zero known vulnerabilities after adding
+  Terminal Kit 3.1.4.
+- The dashboard requires an interactive terminal. Piped invocation refuses
+  cleanly with no terminal escapes; explicit serve/export paths retain their
+  tested stdout contracts. Live traffic monitoring is not implemented.
+
 ## Guided onboarding update
 
 - `npm run check` passed. The updated local suite has **58 passed, 0 failed,

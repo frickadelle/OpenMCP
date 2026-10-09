@@ -19,6 +19,67 @@ visibility for now. The npm package is private and unpublished. This project
 is independent of the existing OpenMCP project. The working title must change
 before publication; see [name research](docs/research.md). A public source/package release has not been made.
 
+## Terminal dashboard
+
+After installing dependencies, link this local checkout once:
+
+```sh
+npm link --ignore-scripts
+openmcp
+```
+
+`openmcp` opens the keyboard-driven terminal dashboard. `open-mcp` remains an
+alias for the same executable. Without linking, use `npm run browse` or
+`node src/cli.js`. The existing commands (`init`, `serve`, `doctor`, etc.) remain
+available through both names.
+
+The left pane lists projects and API sources from version-1 configuration files
+in the current directory. Selecting a source slides its name left and reveals
+its tool cards on the right. Enabled tools pulse; the view animation makes no
+API request and does not claim to show live traffic.
+
+| Key | Action |
+| --- | --- |
+| Up/Down or `j`/`k` | Move within the focused list |
+| Enter / Right | Open the selected MCP's tools |
+| Tab / Shift+Tab | Switch panes |
+| Left / Esc | Return to the MCP list |
+| Space | Enable/disable the selected tool and save its configuration |
+| `s` | Open source settings: base URL, auth, credential variable name, timeout |
+| `r` | Reload project files after external edits |
+| `n` | Create another project through the wizard, then return to the dashboard |
+| `?` | Explain shortcuts and the meaning of toolcalls |
+| `q` / Ctrl+C | Restore the terminal and exit |
+
+Settings have an explicit **Save** entry. Enter edits a field; Enter again accepts
+its value into the form; Esc cancels an edit. Auth settings accept variable names,
+never secret values. Animation preferences apply to the current session. The UI
+requires an interactive terminal of at least 64 columns and 18 rows; enlarge a
+smaller terminal to continue. `OPEN_MCP_NO_ANIMATION=1` disables motion.
+
+Browse another folder or explicit projects:
+
+```sh
+openmcp --projects /path/to/my-projects
+openmcp --config /path/to/project.yaml
+openmcp browse --config first.yaml second.yaml
+openmcp --projects examples
+```
+
+Discovery is local to the selected folder and does not recursively scan the
+computer or import unrelated external MCP client configurations. The examples
+command opens the versioned examples; toggling there edits those example files.
+
+Switches persist as an optional `enabled: false` on tool definitions. Existing
+entries without `enabled` remain active. Names, descriptions and custom schemas
+survive disabling/re-enabling and restarts. Invalid changes fail validation
+before saving. The UI detects a changed config file and asks you to reload
+instead of overwriting a stale snapshot.
+
+Reconnect a running MCP client after changing a tool switch or source setting.
+The server loads its configuration at startup; the dashboard configures exposure
+and does not manage another client's process or monitor live requests.
+
 ## Start from a fresh checkout
 
 Requires Node.js **22.19+** and npm. Development CI targets Node 22 and 24.
@@ -132,13 +193,14 @@ The `examples/auth.config.yaml` example exercises bearer and header API-key auth
 
 | Command | Purpose |
 | --- | --- |
+| `browse` / no command | Animated terminal dashboard for projects, source settings and tool switches |
 | `tour` | Explain import, tools, auth, local serving and client connection with animated ASCII diagrams |
 | `init` | Guided wizard for a new project; refuses to overwrite a file |
 | `add` | Import another API and explicitly select its tools |
 | `tools` | List every operation and whether it is selected or unsupported |
 | `tools --choose` | Edit the allowlist, tool names, descriptions and input schemas |
 | `tools --select api/operation,other/operation` | Replace the complete allowlist explicitly |
-| `tools --select ''` | Publish no tools |
+| `tools --select ''` | Publish no tools; retain their definitions as disabled |
 | `tools --json` | Inspect operation schemas as JSON |
 | `validate` | Check documents, configuration and selected operations without auth/network |
 | `validate --strict` | Also fail on unsupported unselected operations |
@@ -165,13 +227,13 @@ node src/cli.js add -c my-project.yaml --id another \
 
 Each new operation starts unselected. Adding a source preserves existing tools.
 Config updates validate before an atomic replacement. Cancellation does not save
-a partial wizard configuration. `tools --select` replaces the entire allowlist.
+a partial wizard configuration. `tools --select` replaces the active allowlist and retains disabled definitions for later reactivation.
 
 ## Configuration and auth
 
 JSON and YAML are supported. `version: 1` is required. Each source has exactly
 one of `spec` (local file path) or `endpoints` (inline REST operations), plus an
-explicit absolute `baseUrl` and `auth`. `tools` is the only publication allowlist.
+explicit absolute `baseUrl` and `auth`. `tools` is the only publication allowlist; entries with `enabled: false` are excluded from serving.
 Names must be unique across all sources; collisions fail instead of receiving
 surprising automatic suffixes.
 
@@ -261,7 +323,7 @@ response data are untrusted API content.
 The official `@modelcontextprotocol/sdk` implements the protocol and stdio
 transport. Swagger Parser validates OpenAPI and resolves local references. Ajv
 validates JSON Schemas and tool arguments. YAML, Commander and Inquirer provide
-file parsing and the CLI. Node's built-in `fetch` sends requests; no HTTP service
+file parsing and the CLI. Terminal Kit renders the dashboard and manages input. Node's built-in `fetch` sends requests; no HTTP service
 or database sits between the client and API.
 
 ```text

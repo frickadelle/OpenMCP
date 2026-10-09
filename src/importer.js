@@ -141,7 +141,7 @@ export async function catalogSource(source, directory) {
 }
 export async function compileProject(config, directory) {
   const catalog = (await Promise.all(config.sources.map(s => catalogSource(s, directory)))).flat();
-  const selected = config.tools.map(tool => {
+  const selected = config.tools.filter(tool => tool.enabled !== false).map(tool => {
     const operation = catalog.find(o => o.source.id === tool.source && o.operation === tool.operation);
     assert(operation, `Tool ${tool.name}: operation ${tool.operation} was not found in source ${tool.source}.`);
     assert(!operation.error, `Tool ${tool.name}: ${operation.error}`);

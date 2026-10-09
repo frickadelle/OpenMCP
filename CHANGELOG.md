@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — terminal dashboard
+
+- Added `openmcp` / no-argument launch with project/source navigation, sliding
+  titles, staggered tool cards and enabled-state animation.
+- Added Space switches, source Settings (`s`), reload (`r`), new project (`n`),
+  help (`?`) and terminal restoration on quit.
+- Added optional version-1 `tools[].enabled`; disabled tools retain customization
+  and are excluded from SDK listing/calls after reconnecting the client.
+- Preserved the scripted CLI and protocol/export stdout behavior.
+- Added stale-edit checks, settings validation and actual SDK disabled-tool proof.
+
 ## Unreleased — clearer onboarding
 
 - Added `tour` / `npm run tour`: five narrated ASCII chapters with moving packets.
