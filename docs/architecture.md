@@ -99,9 +99,10 @@ saves. A file-content fingerprint detects external edits before replacement.
 It is a stale-edit guard, not a cross-process transactional lock.
 
 `workbench.js` uses Terminal Kit's screen buffer and keyboard handling. A pure
-frame model supports animation/layout tests. The source name slides left; tool
-cards reveal and enabled cards pulse. These are view animations, not synthetic
-API calls or claimed live telemetry. Settings retain environment variable names
+frame model supports animation/layout tests. Titles/cards keep fixed positions;
+selecting another source briefly builds the tool borders, then idle rendering
+stops. The terminal owns its default foreground/background colors. These are
+view animations, not synthetic API calls or claimed live telemetry. Settings retain environment variable names
 only. The dashboard does not start an API or change another client's process.
 
 Tool definitions gain optional `enabled`, defaulting to true for compatibility.
@@ -111,6 +112,7 @@ Clients reconnect to load updates. The existing config remains the authority;
 there is no generated server, separate tool registry or UI database.
 
 The UI owns an alternate terminal screen and restores input mode/cursor on exit.
-New-project creation suspends the dashboard for the existing wizard and then
-reopens it. Pipelines are refused for the dashboard; explicit server/export
+New-project creation suspends the dashboard for the name-first wizard and then
+reopens it. The wizard derives config filename/source id, preserves explicit
+tool selection and makes detailed client instructions optional. Pipelines are refused for the dashboard; explicit server/export
 commands preserve their stdout contract.

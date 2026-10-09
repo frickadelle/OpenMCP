@@ -5,6 +5,19 @@ The source repository is public on GitHub (visibility checked on 2026-10-09).
 No npm/package release has been made. Initial private-visibility evidence below
 records the status at that earlier checkpoint.
 
+## Pull request checkpoint
+
+- Integrated current `main` dependencies: Commander 15.0.0 and Inquirer prompts
+  8.7.3; retained Terminal Kit 3.1.4. Package root and lockfile conflicts were
+  resolved with both feature and dependency-update intent preserved.
+- `npm ci --ignore-scripts` installed 251 packages and reported **0 known
+  vulnerabilities**. `npm run check` passed; **75 tests passed, 0 failed/skipped**.
+  All four versioned examples passed strict validation.
+- Repeated all three simple-onboarding PTY flows after the dependency integration;
+  OpenAPI/manual/demo setup, optional guide and return to the dashboard passed.
+- Host detection/direct connection is a prioritized follow-up in `BACKLOG.md`,
+  not delivered behavior in this PR.
+
 ## Simplified onboarding
 
 - `npm run check` passed. Full regression: **75 passed, 0 failed, 0 skipped**
