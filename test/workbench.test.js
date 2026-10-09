@@ -144,7 +144,7 @@ test('tool frames build in place, then remain unchanged with no idle animation',
   assert.equal(top.x, finishedTop.x); assert.equal(top.y, finishedTop.y);
   assert(top.text.length < finishedTop.text.length);
   assert(!building.some(l => l.text === 'manual_get' || l.text === p.config.tools[0].name));
-  for (let i = 0; i < 20; i++) advanceBuild(state);
+  for (let i = 0; i < 30; i++) advanceBuild(state, i * 16);
   assert.equal(state.progress, 1);
   assert.deepEqual(frameLines(state, 100, 30), complete);
   state.progress = 0; state.motion = false; assert.equal(advanceBuild(state), false);
@@ -228,4 +228,24 @@ test('project name derives a discoverable unused config file without a filename 
   assert.equal(projectFileForName(dir, 'test'), join(dir, 'test-3.yaml'));
   assert.throws(() => projectFileForName(dir, '../outside'), /short name/);
   assert.equal(await readFile(join(dir, 'test.yaml'), 'utf8'), 'original');
+});
+
+test('animation follows elapsed time and connect panel scrolls without overlapping existing containers', async t => {
+  const p = await project(t); const state = createViewState([p]);
+  state.progress = 0;
+  advanceBuild(state, 100); advanceBuild(state, 280);
+  assert.equal(state.progress, 0.5);
+  advanceBuild(state, 460); assert.equal(state.progress, 1);
+  assert.equal(advanceBuild(state, 900), false);
+  state.mode = 'connect'; state.host = 3;
+  state.hosts = ['Codex', 'Claude Code', 'Claude Desktop', 'OpenCode'].map(name => ({ name, status: 'Ready to configure' }));
+  for (const width of [64, 80, 100]) for (const height of [18, 24, 28]) {
+    const lines = frameLines(state, width, height); const cells = new Set();
+    assert(lines.some(l => l.text.includes('> OpenCode')));
+    assert(lines.some(l => l.text.includes('Enter: configure')));
+    for (const line of lines) for (let i = 0; i < line.text.length; i++) {
+      const key = `${line.x + i},${line.y}`;
+      assert(line.x + i < width && line.y < height); assert(!cells.has(key), key); cells.add(key);
+    }
+  }
 });

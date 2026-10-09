@@ -37,7 +37,9 @@ available through both names.
 The left ASCII container lists projects and API sources from version-1
 configuration files in the current directory. Each tool has its own ASCII box
 with a right-aligned ON/OFF switch. Changing the selected MCP briefly draws the
-tool borders in place, then reveals their content. Names and boxes stay fixed;
+tool borders in place over 360 ms, with eased progress and gradually revealed
+content. Timing follows elapsed time instead of adding coarse steps per frame.
+Names and boxes stay fixed;
 there is no sliding or idle pulsing. Opening the tools with Enter does not
 restart the build. The UI uses the terminal's default background and text color.
 Browsing does not call the API or claim to show live traffic. The left footer
@@ -57,6 +59,7 @@ tools to MCP navigation. Dashboard, wizard and tour text use English.
 | Left / Esc | Return to the MCP list |
 | Space | Enable/disable the selected tool and save its configuration |
 | `s` | Open source settings: base URL, auth, credential variable name, timeout |
+| `c` | Detect MCP hosts and configure the selected project's client connection |
 | `r` | Reload project files after external edits |
 | `n` | Create another project through the wizard, then return to the dashboard |
 | `d` | Set up the local Notes demo, with explicit tool selection |
@@ -98,6 +101,35 @@ instead of overwriting a stale snapshot.
 Reconnect a running MCP client after changing a tool switch or source setting.
 The server loads its configuration at startup; the dashboard configures exposure
 and does not manage another client's process or monitor live requests.
+
+## Connect a client directly
+
+Select your MCP and press **c**. Choose Codex, Claude Code, Claude Desktop or
+OpenCode, then press **Enter**. Open MCP registers the whole project as
+`openmcp_PROJECT_NAME`, with absolute launch paths. The wizard offers the same
+**Connect to Codex, Claude or OpenCode** action after saving.
+
+Detection uses executable paths and known macOS app locations. Setup preserves
+other servers/settings, saves a private backup before editing existing files and
+refuses name conflicts. Repeating setup for the same entry does not rewrite it.
+The UI reports **Configured (restart host)**: restart the client or its session
+to load tools. It does not claim the running client is already connected. In
+the Connect panel, **t** tests the local MCP server's tool list without calling
+your API; **Esc** returns to browsing.
+
+```sh
+openmcp connect --config notes.yaml --list  # read-only detection/status
+openmcp connect --config notes.yaml --host codex
+openmcp connect --config notes.yaml --host claude-code
+openmcp connect --config notes.yaml --host opencode
+```
+
+Codex forwards named environment variables. Claude Code and OpenCode store
+environment references, never your credential values. Set those variables in
+the host's environment before starting it. Claude Desktop direct setup currently
+supports public APIs only. OpenCode 1.x is supported; other versions are clearly
+rejected. macOS is the tested platform. See [host formats and verification
+boundaries](docs/hosts.md) for actual host proof and remaining limits.
 
 ## Onboarding from the dashboard
 
@@ -254,6 +286,7 @@ The `examples/auth.config.yaml` example exercises bearer and header API-key auth
 | `validate --strict` | Also fail on unsupported unselected operations |
 | `serve` | Load configuration once and run MCP over stdio |
 | `doctor` | Check credentials; spawn and connect a real SDK MCP client; list tools |
+| `connect --list` / `connect --host ID` | Detect hosts or register the project in the selected host's user configuration |
 | `doctor --probe tool --args '{...}'` | Also call an explicitly named GET/HEAD tool |
 | `export --client inspector` | Print tested client JSON to stdout, with absolute paths |
 

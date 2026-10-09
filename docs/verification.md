@@ -5,6 +5,39 @@ The source repository is public on GitHub (visibility checked on 2026-10-09).
 No npm/package release has been made. Initial private-visibility evidence below
 records the status at that earlier checkpoint.
 
+## Direct host setup and time-based build
+
+- Full regression: **85 passed, 0 failed, 0 skipped** with local networking.
+  `npm run check` and all four strict example validations passed. Two small
+  parser dependencies installed without lifecycle scripts; npm reported zero
+  known vulnerabilities. Host regression covers retained servers/settings and
+  comments, TOML dates, private backups, idempotence, duplicate keys, malformed
+  files, name conflicts, symlinks, sealed TOML and unsupported OpenCode versions.
+- `npm run test:hosts:installed` passed against installed **Codex 0.162.0**,
+  **Claude Code 2.1.295** and **OpenCode 1.18.35**. It used an isolated temporary
+  home and synthetic bearer variable. Codex's actual app-server listed tools and
+  called one authenticated loopback GET. Claude Code and OpenCode reported the
+  fixture connected. No LLM request or personal host-file edit was made.
+- OpenCode's isolated headless server additionally returned connected in `/mcp`.
+  Actual tool calls through Claude Code/OpenCode and Desktop runtime are untested;
+  Desktop direct setup is limited to public APIs. Details and source links are
+  in `hosts.md`. Inspector's pinned runtime list/call gate remains green.
+- PTYs at 64x18, 80x24 and 100x28 selected Connect, registered Codex in temporary
+  profiles and returned to browsing; quit/navigation proof remained green.
+  The post-save wizard Connect action also registered Codex in a temporary home,
+  displayed restart guidance and returned to the refreshed dashboard. All three
+  existing wizard paths and the optional guide still passed after the new choice.
+- A real PTY measured **19 drawing updates, completion at 364 ms**, then **zero
+  output for 400 ms idle**. Native macOS Terminal 80x24 inspection confirmed
+  stable card positions, progressive text, default colors, host selection and
+  configured status. Only synthetic preview configs were changed.
+- Native inspection exposed a repeated OpenCode version probe that could time
+  out under concurrent tests. Positive version results are now cached against the
+  executable's modification fingerprint and probes have a bounded 8-second limit.
+- Initial host tests exposed parser-produced null-prototype objects; semantic
+  comparison now normalizes object prototypes while preserving TOML date values.
+  Passing evidence refers to the corrected final behavior, not those failures.
+
 ## Menu navigation, English UI and quit confirmation
 
 - Diagnosed the reported singleton menu against the local source rows: one
