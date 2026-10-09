@@ -13,10 +13,11 @@ local server. No server code generation, cloud account or LLM API key.
                     versioned configuration
 ```
 
-**Local MVP, version 0.1.0.** The package is private and unpublished. This project
+**Local MVP, version 0.1.0.** The source repository is available at
+[frickadelle/OpenMCP](https://github.com/frickadelle/OpenMCP) with private GitHub
+visibility for now. The npm package is private and unpublished. This project
 is independent of the existing OpenMCP project. The working title must change
-before publication; see [name research](docs/research.md). A public repository
-and package have not been published by this checkout.
+before publication; see [name research](docs/research.md). A public source/package release has not been made.
 
 ## Start from a fresh checkout
 
@@ -40,21 +41,31 @@ In terminal A, start the included API:
 npm run demo
 ```
 
-In terminal B:
+In terminal B, start with the animated explanation if you are new to MCP:
 
 ```sh
-node src/cli.js init
+npm run tour
+npm run onboard
 ```
 
-Accept the project name. Choose **Local OpenAPI JSON / YAML file**. Accept source
-id `demo`, file `examples/openapi.yaml` and base URL `http://127.0.0.1:3001`.
-Choose **None / public API**. Use **Space** to select `getNote` and `createNote`,
-then **Enter**. Skip customization on your first run.
+The tour explains all five steps with moving ASCII diagrams. Press Enter between
+chapters. It creates no files and makes no API requests. The wizard explains each
+choice in German with concrete examples; commands, config keys and repository
+documentation remain in English.
+
+Accept the project name and source id `demo`. Choose the recommended local
+example. Use **Space** to select `getNote` and `createNote`, then **Enter**. Skip
+customization on your first run. Choose **Kein Schluessel / oeffentliche API**.
+The wizard ends with exact commands and explains which process starts which API.
+The selection step now comes before authentication.
 
 ```sh
 node src/cli.js doctor --probe demo_getNote --args '{"path":{"id":"1"}}'
 node src/cli.js export > client.local.json
 ```
+
+Already have a project? Edit its selection with `node src/cli.js tools --choose`.
+Create another config with `node src/cli.js init --config another-project.yaml`.
 
 Connect the tested MCP Inspector client and call a tool:
 
@@ -82,8 +93,9 @@ For its browser interface, omit `--cli` and the method flags. Only the CLI
 interface is covered by automated acceptance tests; desktop AI clients and the
 Inspector browser UI are not claimed as tested.
 
-ASCII banners, progress ribbons and spinners run in interactive terminals on
-**stderr**. They stop for CI, pipes and `serve`. Disable them with
+ASCII banners, five chapter diagrams, animated request/response packets, tool
+reveals, progress ribbons and spinners run in interactive terminals on **stderr**. Motion stops for CI and pipes; static tour explanations remain readable.
+`serve` never emits onboarding output. Disable them with
 `OPEN_MCP_NO_ANIMATION=1` or `TERM=dumb`. They never delay HTTP calls.
 
 The five-minute target is for a supported API with a local spec and available
@@ -120,7 +132,8 @@ The `examples/auth.config.yaml` example exercises bearer and header API-key auth
 
 | Command | Purpose |
 | --- | --- |
-| `init` | Wizard for a new project; refuses to overwrite a file |
+| `tour` | Explain import, tools, auth, local serving and client connection with animated ASCII diagrams |
+| `init` | Guided wizard for a new project; refuses to overwrite a file |
 | `add` | Import another API and explicitly select its tools |
 | `tools` | List every operation and whether it is selected or unsupported |
 | `tools --choose` | Edit the allowlist, tool names, descriptions and input schemas |
