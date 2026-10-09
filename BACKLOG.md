@@ -16,15 +16,20 @@
 
 ## P1 — improve current MVP
 
-4. **Better structural OpenAPI diagnostics.** Provide safe pointer/error summaries
+4. **Detect installed MCP hosts and connect from the dashboard.** Next product
+   slice: list available Codex/OpenCode hosts and add a direct Connect action.
+   Clarify whether the requested "Cloud" target means Claude or a cloud runtime
+   before choosing that adapter. Use documented host configuration formats;
+   detecting an application is not proof of MCP compatibility. Preserve existing
+   servers/settings, create a recoverable backup and avoid secrets in config/logs.
+   Done: each supported host has installation detection, connection setup,
+   explicit status/restart guidance, and a real list/call acceptance test.
+5. **Better structural OpenAPI diagnostics.** Provide safe pointer/error summaries
    without printing request examples or secret values. Done: malformed info,
    references and path definitions identify locations in regression tests.
-5. **SDK v2 migration.** Verify stable package status and transport/client support;
+6. **SDK v2 migration.** Verify stable package status and transport/client support;
    preserve legacy compatibility or document a deliberate break. Done: exported
    configurations and both examples pass against the chosen protocol era.
-6. **Additional desktop client.** Pick one real client and test installation,
-   list/call and credential injection end to end. Done: a client-specific export
-   and reproducible evidence exist; do not label untested clients as supported.
 7. **Broaden OpenAPI schema support deliberately.** Start with readOnly request
    filtering and allOf, then parameter serialization, with real API fixtures.
    Done: every new supported form has mapping/validation tests and matrix updates.

@@ -6,8 +6,9 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { manual, temp, exec, root } from './helpers.js';
 import { discoverProjects, readProjects, readProject, toolsFor, sourceRows, toggleTool, updateSettings } from '../src/workbench-store.js';
-import { createViewState, frameLines, formFor } from '../src/workbench.js';
+import { createViewState, frameLines, formFor, openToolPane, advanceBuild, moveSelection, listMouse } from '../src/workbench.js';
 import { compileProject } from '../src/importer.js';
+import { projectFileForName } from '../src/wizard.js';
 import { exportClient } from '../src/client.js';
 
 async function project(t, config = manual()) {
@@ -58,12 +59,13 @@ test('settings store base URL, timeout and credential variable name without a se
   assert.equal(config.timeoutMs, 12000); assert.equal(config.sources[0].baseUrl, 'https://api.example.test/v1');
   assert.deepEqual(config.sources[0].auth, { type: 'bearer', env: 'API_TOKEN' });
 });
-test('UI frames animate the MCP name left, support small terminals and keep Settings save visible', async t => {
+test('UI title stays fixed, supports small terminals and keeps Settings save visible', async t => {
   const p = await project(t); const state = createViewState([p]);
+  state.progress = 0.12;
   const before = frameLines(state, 90, 28).find(l => l.text === state.rows[0].title);
   state.progress = 1;
   const after = frameLines(state, 90, 28).find(l => l.text === state.rows[0].title);
-  assert(before.x > after.x); assert.equal(after.x, 2);
+  assert.equal(before.x, after.x); assert.equal(after.x, 2);
   assert(frameLines(state, 40, 10).some(l => l.text.includes('vergroessern')));
   state.mode = 'settings'; state.form = formFor(p, 'api', true);
   for (const height of [18, 24, 28, 40]) {
@@ -88,4 +90,104 @@ test('a restarted SDK MCP client cannot list or call a disabled tool', async t =
   assert.equal(client.getServerVersion().name, p.config.name);
   assert.deepEqual((await client.listTools()).tools, []);
   assert.equal((await client.callTool({ name: 'read_item', arguments: { path: { id: '1' } } })).isError, true);
+});
+
+test('ASCII panels and animated cards never overwrite another element, including long tool names', async t => {
+  const config = manual({ name: 'a-long-project-title-for-layout-testing' });
+  config.tools[0].name = 'very_long_tool_name_that_needs_clipping';
+  const p = await project(t, config); const state = createViewState([p]);
+  for (const width of [64, 80, 100, 180]) for (const height of [18, 24, 28, 40]) {
+    for (const progress of [0, 0.12, 0.48, 0.72, 0.96, 1]) {
+      state.mode = 'browse'; state.progress = progress;
+      const lines = frameLines(state, width, height);
+      const cells = new Set();
+      for (const line of lines) for (let i = 0; i < line.text.length; i++) {
+        const x = line.x + i; const key = `${x},${line.y}`;
+        assert(x < width && line.y < height, `outside ${width}x${height}: ${key}`);
+        assert(!cells.has(key), `overlap ${width}x${height} at progress ${progress}: ${key}`);
+        cells.add(key);
+      }
+      assert(lines.some(l => l.text.startsWith('+ DEINE MCPs')));
+      assert(lines.some(l => l.text.startsWith('+ TOOLCALLS')));
+      if (progress === 1) assert(lines.some(l => l.text === '[ ON ]'));
+    }
+    state.mode = 'settings'; state.form = formFor(p, 'api', true);
+    for (const field of [0, 6, 7]) {
+      state.field = field;
+      const lines = frameLines(state, width, height); const cells = new Set();
+      for (const line of lines) for (let i = 0; i < line.text.length; i++) {
+        const key = `${line.x + i},${line.y}`;
+        assert(!cells.has(key), `settings overlap ${width}x${height}: ${key}`); cells.add(key);
+      }
+      assert(lines.some(l => l.text.includes('[ Speichern ]')));
+    }
+  }
+});
+test('Enter or Right focuses tools once without restarting an existing animation or selection', () => {
+  const state = createViewState([]); openToolPane(state);
+  assert.equal(state.pane, 'tools'); assert.equal(state.progress, 1);
+  state.progress = 0.72; state.tool = 3; openToolPane(state);
+  assert.equal(state.progress, 0.72); assert.equal(state.tool, 3);
+  state.progress = 1; openToolPane(state); assert.equal(state.progress, 1);
+  const still = createViewState([], false); openToolPane(still); assert.equal(still.progress, 1);
+});
+
+test('tool frames build in place, then remain unchanged with no idle animation', async t => {
+  const p = await project(t); const state = createViewState([p]);
+  const complete = frameLines(state, 100, 30);
+  assert.equal(advanceBuild(state), false);
+  assert.deepEqual(frameLines(state, 100, 30), complete);
+  state.progress = 0.12;
+  const building = frameLines(state, 100, 30);
+  const top = building.find(l => l.y === 7 && l.text.startsWith('+ TOOL'));
+  const finishedTop = complete.find(l => l.y === 7 && l.text.startsWith('+ TOOL '));
+  assert.equal(top.x, finishedTop.x); assert.equal(top.y, finishedTop.y);
+  assert(top.text.length < finishedTop.text.length);
+  assert(!building.some(l => l.text === 'manual_get' || l.text === p.config.tools[0].name));
+  for (let i = 0; i < 20; i++) advanceBuild(state);
+  assert.equal(state.progress, 1);
+  assert.deepEqual(frameLines(state, 100, 30), complete);
+  state.progress = 0; state.motion = false; assert.equal(advanceBuild(state), false);
+  state.motion = true; state.mode = 'settings'; assert.equal(advanceBuild(state), false);
+});
+
+test('MCP list scrolls beyond the viewport and wheel targets the pane beneath the pointer', async t => {
+  const projects = [];
+  for (let i = 0; i < 7; i++) projects.push(await project(t, manual({ name: `project${i}` })));
+  const state = createViewState(projects, false);
+  assert.equal(moveSelection(state, -1), false);
+  for (let i = 0; i < 6; i++) moveSelection(state, 1);
+  assert.equal(state.row, 6);
+  const lines = frameLines(state, 80, 24);
+  assert(lines.some(l => l.text.includes('> project6')));
+  assert(!lines.some(l => l.text.includes('project0')));
+  assert(lines.some(l => l.text.includes('7/7 | n: neu')));
+  assert.equal(moveSelection(state, 1), false);
+  openToolPane(state);
+  assert.equal(listMouse(state, 'MOUSE_WHEEL_UP', { x: 8, y: 10 }, 80, 24), true);
+  assert.equal(state.pane, 'mcps'); assert.equal(state.row, 5);
+  listMouse(state, 'MOUSE_WHEEL_DOWN', { x: 40, y: 10 }, 80, 24);
+  assert.equal(state.pane, 'tools'); assert.equal(state.tool, 1); assert.equal(state.row, 5);
+  const before = structuredClone(state);
+  assert.equal(listMouse(state, 'MOUSE_WHEEL_DOWN', { x: 1, y: 1 }, 80, 24), false);
+  assert.deepEqual(state, before);
+  state.mode = 'settings';
+  assert.equal(listMouse(state, 'MOUSE_WHEEL_UP', { x: 8, y: 10 }, 80, 24), false);
+});
+test('single-entry MCP list stays bounded and explains how to create another project', async t => {
+  const state = createViewState([await project(t)], true);
+  assert.match(state.status, /Eine API-Quelle/);
+  assert.equal(moveSelection(state, 1), false); assert.equal(moveSelection(state, -1), false);
+  assert.equal(state.row, 0); assert.equal(state.progress, 1);
+  assert(frameLines(state, 80, 24).some(l => l.text.includes('1/1 | n: neu')));
+});
+
+test('project name derives a discoverable unused config file without a filename prompt', async t => {
+  const dir = await temp(t); await mkdir(join(dir, 'test'));
+  assert.equal(projectFileForName(dir, 'test'), join(dir, 'test.yaml'));
+  await writeFile(join(dir, 'test.yaml'), 'original');
+  await writeFile(join(dir, 'test-2.yaml'), 'original');
+  assert.equal(projectFileForName(dir, 'test'), join(dir, 'test-3.yaml'));
+  assert.throws(() => projectFileForName(dir, '../outside'), /kurzen Namen/);
+  assert.equal(await readFile(join(dir, 'test.yaml'), 'utf8'), 'original');
 });

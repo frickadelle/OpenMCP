@@ -14,10 +14,11 @@ local server. No server code generation, cloud account or LLM API key.
 ```
 
 **Local MVP, version 0.1.0.** The source repository is available at
-[frickadelle/OpenMCP](https://github.com/frickadelle/OpenMCP) with private GitHub
-visibility for now. The npm package is private and unpublished. This project
+[frickadelle/OpenMCP](https://github.com/frickadelle/OpenMCP) as public source.
+The npm package remains private and unpublished. This project
 is independent of the existing OpenMCP project. The working title must change
-before publication; see [name research](docs/research.md). A public source/package release has not been made.
+before package publication; see [name research](docs/research.md). No package
+release has been made.
 
 ## Terminal dashboard
 
@@ -33,14 +34,22 @@ alias for the same executable. Without linking, use `npm run browse` or
 `node src/cli.js`. The existing commands (`init`, `serve`, `doctor`, etc.) remain
 available through both names.
 
-The left pane lists projects and API sources from version-1 configuration files
-in the current directory. Selecting a source slides its name left and reveals
-its tool cards on the right. Enabled tools pulse; the view animation makes no
-API request and does not claim to show live traffic.
+The left ASCII container lists projects and API sources from version-1
+configuration files in the current directory. Each tool has its own ASCII box
+with a right-aligned ON/OFF switch. Changing the selected MCP briefly draws the
+tool borders in place, then reveals their content. Names and boxes stay fixed;
+there is no sliding or idle pulsing. Opening the tools with Enter does not
+restart the build. The UI uses the terminal's default background and text color.
+Browsing does not call the API or claim to show live traffic. The left footer
+shows the selected source position and total count. A single-source list has
+no further entries; press `n` to create another project. Use Left/Tab to return
+from tools to MCP navigation.
 
 | Key | Action |
 | --- | --- |
-| Up/Down or `j`/`k` | Move within the focused list |
+| Up/Down or `j`/`k` | Move within the focused list; stop at its first/last entry |
+| Mouse wheel | Move within the list beneath the pointer (terminal mouse reporting required) |
+| Click | Focus a list and select a visible entry; never toggle or call a tool |
 | Enter / Right | Open the selected MCP's tools |
 | Tab / Shift+Tab | Switch panes |
 | Left / Esc | Return to the MCP list |
@@ -51,7 +60,8 @@ API request and does not claim to show live traffic.
 | `?` | Explain shortcuts and the meaning of toolcalls |
 | `q` / Ctrl+C | Restore the terminal and exit |
 
-Settings have an explicit **Save** entry. Enter edits a field; Enter again accepts
+Settings have an explicit **Save** entry, visible even in short terminals. Use
+Up/Down in help to scroll its explanation. Enter edits a field; Enter again accepts
 its value into the form; Esc cancels an edit. Auth settings accept variable names,
 never secret values. Animation preferences apply to the current session. The UI
 requires an interactive terminal of at least 64 columns and 18 rows; enlarge a
@@ -79,6 +89,31 @@ instead of overwriting a stale snapshot.
 Reconnect a running MCP client after changing a tool switch or source setting.
 The server loads its configuration at startup; the dashboard configures exposure
 and does not manage another client's process or monitor live requests.
+
+## Onboarding from the dashboard
+
+Press `n`. The first two questions are the MCP name and whether you have an
+OpenAPI YAML/JSON file. The wizard derives the config filename and API source
+id automatically. Existing files stay intact; a repeated name receives a numbered
+filename such as `notes-2.yaml`.
+
+With a file, choose its path, mark the tools to expose and set authentication.
+The wizard reuses a single valid API server address from the file; it asks for
+an address if that choice is ambiguous or missing. Tool names and input schemas
+use the imported defaults. Advanced customization stays in `tools --choose`.
+
+Without a file, the wizard explains what is needed and offers your own API or a
+local demo. For your own API, supply its address and one GET path from its
+documentation. Path placeholders become required text inputs automatically.
+No API requests are made during setup. Open MCP does not infer arbitrary API
+endpoints from a website or invent them. Writes, query/header inputs and body
+schemas remain available through `add` or a manual config.
+
+The final summary gives the saved file and selected tool count. Client connection
+instructions are optional through **Zeig mir, wie ich meinen Client verbinde**.
+Choose **Zur MCP-Uebersicht** to return to the refreshed dashboard. Creating a
+config does not start an API or connect a client. Outside the dashboard, use
+`openmcp init`; an explicit `--config` remains available for scripts.
 
 ## Start from a fresh checkout
 
@@ -109,40 +144,39 @@ npm run tour
 npm run onboard
 ```
 
-The tour explains all five steps with moving ASCII diagrams. Press Enter between
-chapters. It creates no files and makes no API requests. The wizard explains each
-choice in German with concrete examples; commands, config keys and repository
-documentation remain in English.
+The optional tour explains all five steps with moving ASCII diagrams. It creates
+no files and makes no API requests. The default wizard starts with your MCP name
+and the OpenAPI-file question instead of requiring the tour or showing chapters.
 
-Accept the project name and source id `demo`. Choose the recommended local
-example. Use **Space** to select `getNote` and `createNote`, then **Enter**. Skip
-customization on your first run. Choose **Kein Schluessel / oeffentliche API**.
-The wizard ends with exact commands and explains which process starts which API.
-The selection step now comes before authentication.
+Enter `notes-demo` as the name. Answer **No** to the file question, then choose
+**Erst ein lokales Beispiel ausprobieren**. Use **Space** to select `getNote`
+and `createNote`, then **Enter**. Choose **Kein Schluessel / oeffentliche API**.
+The source id is `api`; the filename is `notes-demo.yaml`. Advanced tool/schema
+questions are omitted. Client instructions are optional at the final menu.
 
 ```sh
-node src/cli.js doctor --probe demo_getNote --args '{"path":{"id":"1"}}'
-node src/cli.js export > client.local.json
+node src/cli.js doctor --config notes-demo.yaml --probe api_getNote --args '{"path":{"id":"1"}}'
+node src/cli.js export --config notes-demo.yaml > client.local.json
 ```
 
-Already have a project? Edit its selection with `node src/cli.js tools --choose`.
-Create another config with `node src/cli.js init --config another-project.yaml`.
+Edit the selection with `node src/cli.js tools --config notes-demo.yaml --choose`.
+Create another project with `node src/cli.js init`.
 
 Connect the tested MCP Inspector client and call a tool:
 
 ```sh
 MCP_INSPECTOR_SECRET_STORE=memory npx --no-install @modelcontextprotocol/inspector \
-  --cli --config client.local.json --server open-mcp \
+  --cli --config client.local.json --server notes-demo \
   --format json --method tools/list
 
 MCP_INSPECTOR_SECRET_STORE=memory npx --no-install @modelcontextprotocol/inspector \
-  --cli --config client.local.json --server open-mcp \
-  --format json --method tools/call --tool-name demo_getNote \
+  --cli --config client.local.json --server notes-demo \
+  --format json --method tools/call --tool-name api_getNote \
   --tool-args-json '{"path":{"id":"1"},"query":{"verbose":true}}'
 
 MCP_INSPECTOR_SECRET_STORE=memory npx --no-install @modelcontextprotocol/inspector \
-  --cli --config client.local.json --server open-mcp \
-  --format json --method tools/call --tool-name demo_createNote \
+  --cli --config client.local.json --server notes-demo \
+  --format json --method tools/call --tool-name api_createNote \
   --tool-args-json '{"body":{"title":"My first MCP note"}}'
 ```
 
@@ -154,8 +188,8 @@ For its browser interface, omit `--cli` and the method flags. Only the CLI
 interface is covered by automated acceptance tests; desktop AI clients and the
 Inspector browser UI are not claimed as tested.
 
-ASCII banners, five chapter diagrams, animated request/response packets, tool
-reveals, progress ribbons and spinners run in interactive terminals on **stderr**. Motion stops for CI and pipes; static tour explanations remain readable.
+The optional tour and advanced API wizard include ASCII chapter diagrams,
+animated packets and progress ribbons. Short setup spinners run in interactive terminals on **stderr**. Motion stops for CI and pipes; static tour explanations remain readable.
 `serve` never emits onboarding output. Disable them with
 `OPEN_MCP_NO_ANIMATION=1` or `TERM=dumb`. They never delay HTTP calls.
 

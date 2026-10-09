@@ -1,13 +1,12 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
-import { input } from '@inquirer/prompts';
 import { resolve } from 'node:path';
 import { existsSync } from 'node:fs';
 import { runWorkbench } from './workbench.js';
 import { loadConfig, saveConfig, validateConfig } from './config.js';
 import { compileProject } from './importer.js';
 import { tour } from './tour.js';
-import { initialize, addSource, selectTools } from './wizard.js';
+import { initialize, addSource, selectTools, finishOnboarding } from './wizard.js';
 import { serve } from './server.js';
 import { exportClient, diagnose } from './client.js';
 import { busy, ribbon } from './ui.js';
@@ -22,8 +21,9 @@ async function browse(options = {}) {
     if (action?.action !== 'create') return;
     let path;
     try {
-      path = resolve(directory, await input({ message: 'Dateiname fuer das neue MCP-Projekt', default: existsSync(resolve(directory, 'open-mcp.yaml')) ? 'neues-mcp.yaml' : 'open-mcp.yaml' }));
-      await initialize(path, {});
+      const result = await initialize(undefined, { directory, simple: true });
+      path = result.path;
+      await finishOnboarding(result, true);
     } catch (error) {
       if (error.name !== 'ExitPromptError') throw error;
     }
@@ -40,8 +40,12 @@ const sourceOptions = command => command.option('--spec <path>', 'Local OpenAPI 
   .option('--base-url <url>', 'Override API base URL').option('--auth <type>', 'none, bearer or apiKey')
   .option('--env <name>', 'Credential environment variable name').option('--key-in <location>', 'API-key location: header or query')
   .option('--key-name <name>', 'API-key header/query name').option('--select <operations>', 'Explicit comma-separated operation ids; empty string selects none');
-sourceOptions(configOption(program.command('init').description('Create a project with the interactive wizard')))
-  .option('--name <name>', 'Project name').action(async options => initialize(options.config, options));
+sourceOptions(program.command('init').description('Create a project with the interactive wizard')
+  .option('-c, --config <path>', 'Optional project file; otherwise derived from its name'))
+  .option('--name <name>', 'Project name').action(async options => {
+    const result = await initialize(options.config, options);
+    await finishOnboarding(result);
+  });
 sourceOptions(configOption(program.command('add').description('Add another API and select its tools'))).action(async options => {
   const { config, path, directory } = await loadConfig(options.config);
   await addSource(config, path, options); validateConfig(config); await compileProject(config, directory); await saveConfig(path, config);

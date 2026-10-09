@@ -4,7 +4,7 @@
 | --- | --- | --- |
 | Import | Local JSON/YAML OpenAPI 3.0.x and 3.1.x, at most 5 MiB | Swagger 2, OpenAPI 3.2, URL imports; convert/download locally first |
 | References | Non-recursive local `#/...` refs | External refs, cycles, `$ref` siblings beyond summary/description; bundle externally first |
-| Manual endpoints | Method, path, description, parameters, JSON body schema | Static headers/secret literals, scripts, templating, arbitrary parameter mapping |
+| Manual endpoints | Method, path, description, parameters, JSON body schema; simple onboarding starts with one GET path and inferred text placeholders | Static headers/secret literals, scripts, templating, arbitrary parameter mapping |
 | Methods | GET, HEAD, OPTIONS, POST, PUT, PATCH, DELETE | TRACE; GET/HEAD bodies |
 | Server | One explicit absolute HTTP(S) base URL per source, base paths retained | Path/operation server overrides; unresolved server variables; no implicit server selection |
 | Path | Required scalar string/integer/number/boolean, simple style, percent encoding | Arrays, objects, null, dot-segment values, literal query/fragment/backslash in operation paths |
@@ -38,3 +38,8 @@ securitySchemes and source auth. Authentication is never a tool argument.
 
 These constraints deliberately keep the runtime small. They are limitations,
 not claims that every valid OpenAPI document can be imported.
+
+Simple onboarding needs a local OpenAPI file or a documented API address and
+GET path. It does not discover endpoints from a website, infer body/query types
+from response samples, or use an LLM. The full manual configuration and `add`
+wizard remain available for more complex requests.
