@@ -32,7 +32,7 @@ export async function createServer(config, directory, env = process.env) {
 export async function serve(config, directory) {
   const server = await createServer(config, directory);
   await server.connect(new StdioServerTransport());
-  process.stderr.write(`[${config.name}] ready: ${config.tools.length} selected tools over stdio\n`);
+  process.stderr.write(`[${config.name}] ready: ${config.tools.filter(t => t.enabled !== false).length} selected tools over stdio\n`);
   let closing = false;
   const close = async () => { if (closing) return; closing = true; await server.close(); process.exit(0); };
   process.once('SIGINT', close); process.once('SIGTERM', close);

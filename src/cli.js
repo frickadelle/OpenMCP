@@ -1,23 +1,51 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
+import { resolve } from 'node:path';
+import { existsSync } from 'node:fs';
+import { runWorkbench } from './workbench.js';
 import { loadConfig, saveConfig, validateConfig } from './config.js';
 import { compileProject } from './importer.js';
 import { tour } from './tour.js';
-import { initialize, addSource, selectTools } from './wizard.js';
+import { initialize, addSource, selectTools, finishOnboarding } from './wizard.js';
 import { serve } from './server.js';
 import { exportClient, diagnose } from './client.js';
 import { busy, ribbon } from './ui.js';
 import { UserError, assert, redact } from './errors.js';
 
-const program = new Command().name('open-mcp').version('0.1.0').description('Open MCP (working title): local HTTP APIs as selected MCP tools');
+const program = new Command().enablePositionalOptions().name('openmcp').version('0.1.0').description('Open MCP (working title): local HTTP APIs as selected MCP tools');
+async function browse(options = {}) {
+  const directory = resolve(options.projects ?? process.cwd());
+  let configs = options.config ? (Array.isArray(options.config) ? options.config : [options.config]) : [];
+  while (true) {
+    const action = await runWorkbench({ directory, configs });
+    if (action?.action !== 'create') return;
+    let path;
+    try {
+      const result = await initialize(undefined, { directory, simple: true });
+      path = result.path;
+      await finishOnboarding(result, true);
+    } catch (error) {
+      if (error.name !== 'ExitPromptError') throw error;
+    }
+    if (path && configs.length && existsSync(path) && !configs.includes(path)) configs = [...configs, path];
+  }
+}
+program.option('--projects <directory>', 'Browse project configurations in this directory')
+  .option('-c, --config <path>', 'Open one project in the terminal dashboard').action(browse);
+program.command('browse').description('Browse MCP projects and toggle tools in the animated terminal dashboard')
+  .option('--projects <directory>', 'Project folder').option('-c, --config <paths...>', 'Explicit project files').action(browse);
 program.command('tour').description('Explain the five onboarding steps with animated ASCII diagrams').action(tour);
 const configOption = command => command.option('-c, --config <path>', 'Project JSON/YAML file', 'open-mcp.yaml');
 const sourceOptions = command => command.option('--spec <path>', 'Local OpenAPI JSON/YAML file').option('--id <id>', 'Source id')
   .option('--base-url <url>', 'Override API base URL').option('--auth <type>', 'none, bearer or apiKey')
   .option('--env <name>', 'Credential environment variable name').option('--key-in <location>', 'API-key location: header or query')
   .option('--key-name <name>', 'API-key header/query name').option('--select <operations>', 'Explicit comma-separated operation ids; empty string selects none');
-sourceOptions(configOption(program.command('init').description('Create a project with the interactive wizard')))
-  .option('--name <name>', 'Project name').action(async options => initialize(options.config, options));
+sourceOptions(program.command('init').description('Create a project with the interactive wizard')
+  .option('-c, --config <path>', 'Optional project file; otherwise derived from its name'))
+  .option('--name <name>', 'Project name').action(async options => {
+    const result = await initialize(options.config, options);
+    await finishOnboarding(result);
+  });
 sourceOptions(configOption(program.command('add').description('Add another API and select its tools'))).action(async options => {
   const { config, path, directory } = await loadConfig(options.config);
   await addSource(config, path, options); validateConfig(config); await compileProject(config, directory); await saveConfig(path, config);
@@ -32,7 +60,7 @@ configOption(program.command('tools').description('List operations or edit the e
     }
     const { catalog, selected } = await compileProject(config, directory);
     const rows = catalog.map(o => ({ source: o.source.id, operation: o.operation, method: o.method, path: o.path,
-      selected: config.tools.some(t => t.source === o.source.id && t.operation === o.operation),
+      selected: config.tools.some(t => t.source === o.source.id && t.operation === o.operation && t.enabled !== false),
       ...(o.error ? { error: o.error } : { publishedName: selected.find(t => t.source.id === o.source.id && t.operation === o.operation)?.name ?? null,
         inputSchema: selected.find(t => t.source.id === o.source.id && t.operation === o.operation)?.inputSchema ?? o.inputSchema }) }));
     if (options.json) console.log(JSON.stringify(rows, null, 2));

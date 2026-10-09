@@ -4,7 +4,7 @@
 | --- | --- | --- |
 | Import | Local JSON/YAML OpenAPI 3.0.x and 3.1.x, at most 5 MiB | Swagger 2, OpenAPI 3.2, URL imports; convert/download locally first |
 | References | Non-recursive local `#/...` refs | External refs, cycles, `$ref` siblings beyond summary/description; bundle externally first |
-| Manual endpoints | Method, path, description, parameters, JSON body schema | Static headers/secret literals, scripts, templating, arbitrary parameter mapping |
+| Manual endpoints | Method, path, description, parameters, JSON body schema; simple onboarding starts with one GET path and inferred text placeholders | Static headers/secret literals, scripts, templating, arbitrary parameter mapping |
 | Methods | GET, HEAD, OPTIONS, POST, PUT, PATCH, DELETE | TRACE; GET/HEAD bodies |
 | Server | One explicit absolute HTTP(S) base URL per source, base paths retained | Path/operation server overrides; unresolved server variables; no implicit server selection |
 | Path | Required scalar string/integer/number/boolean, simple style, percent encoding | Arrays, objects, null, dot-segment values, literal query/fragment/backslash in operation paths |
@@ -16,6 +16,7 @@
 | Auth | Source-wide bearer, API key in header or query; runtime env values | OAuth, Basic, cookies, scoped/combined security, per-operation credentials; unsupported alternatives conservatively reject the operation |
 | Responses | JSON and text, including empty/204 and application/*+json; at most 1 MiB | Binary/media outputs, streaming, output schema validation, automatic pagination; errors at call time for unsupported response types |
 | Reliability | Total timeout 1–300000 ms, default 10000; cancellation; no retries | No automatic retries for any method; no redirect following |
+| Dashboard | Local project/source discovery, persistent tool switches, source settings and session animation preference | No live request monitor, external client-config import, cross-process hot reload or global project registry |
 | MCP | Official SDK 1.32.1 stdio, list/call tools, advisory read/write annotations | Modern protocol era from SDK v2, HTTP transport, resources/prompts, OAuth, hot reload |
 | Client export | MCP Inspector 2.10.1 CLI, legacy protocol era | Desktop-client installation/testing; export contains absolute machine-specific paths and no credentials |
 
@@ -37,3 +38,8 @@ securitySchemes and source auth. Authentication is never a tool argument.
 
 These constraints deliberately keep the runtime small. They are limitations,
 not claims that every valid OpenAPI document can be imported.
+
+Simple onboarding needs a local OpenAPI file or a documented API address and
+GET path. It does not discover endpoints from a website, infer body/query types
+from response samples, or use an LLM. The full manual configuration and `add`
+wizard remain available for more complex requests.

@@ -25,7 +25,7 @@ export const configSchema = object({
     }, ['id', 'method', 'path']) }
   }, ['id', 'baseUrl', 'auth']) },
   tools: { type: 'array', items: object({ source: ident, operation: text, name: ident,
-    description: text, inputSchema: { type: 'object' } }, ['source', 'operation', 'name']) }
+    description: text, inputSchema: { type: 'object' }, enabled: { type: 'boolean' } }, ['source', 'operation', 'name']) }
 }, ['version', 'name', 'sources', 'tools']);
 const check = validator(configSchema, 'Configuration schema');
 export async function readDocument(path) {

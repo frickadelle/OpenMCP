@@ -9,7 +9,8 @@
     "node": ">=22.19.0"
   },
   "bin": {
-    "open-mcp": "src/cli.js"
+    "open-mcp": "src/cli.js",
+    "openmcp": "src/cli.js"
   },
   "scripts": {
     "start": "node src/cli.js",
@@ -19,7 +20,8 @@
     "demo": "node examples/api.js",
     "smoke": "node scripts/smoke.js",
     "onboard": "node src/cli.js init",
-    "tour": "node src/cli.js tour"
+    "tour": "node src/cli.js tour",
+    "browse": "node src/cli.js"
   },
   "dependencies": {
     "@apidevtools/swagger-parser": "^12.1.0",
@@ -28,6 +30,7 @@
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
     "commander": "^15.0.0",
+    "terminal-kit": "^3.1.4",
     "yaml": "^2.8.1"
   },
   "devDependencies": {
