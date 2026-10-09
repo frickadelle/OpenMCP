@@ -22,7 +22,8 @@
     "onboard": "node src/cli.js init",
     "tour": "node src/cli.js tour",
     "browse": "node src/cli.js",
-    "test:hosts:installed": "node scripts/verify-hosts.js"
+    "test:hosts:installed": "node scripts/verify-hosts.js",
+    "test:deployment": "node scripts/verify-deployment.js"
   },
   "dependencies": {
     "@apidevtools/swagger-parser": "^13.1.0",

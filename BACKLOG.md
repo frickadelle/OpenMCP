@@ -36,7 +36,10 @@
 ## P2 — only after the CLI remains stable
 
 8. Local web UI over the same configuration/compiler.
-9. HTTP transport with a clear authentication and process-lifecycle design.
+9. **Broaden self-hosting proof.** Delivered: SDK HTTP, shared-token protection,
+   portable Docker/Caddy/domain package, TLS adapter and isolated Docker gate.
+   Remaining: real owned-domain DNS/ACME acceptance, upgrade/rollback exercises,
+   client-specific remote runtime proof, per-user auth and browser OAuth support.
 10. OAuth and additional import formats, each as a bounded feature with tests.
 
 No marketplace, billing, hosted platform, user management or integration catalog

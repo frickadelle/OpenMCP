@@ -25,6 +25,12 @@ Sources: [official Codex MCP configuration](https://developers.openai.com/codex/
 [Claude Desktop local server setup](https://modelcontextprotocol.io/docs/develop/connect-local-servers),
 [OpenCode 1.x MCP settings](https://opencode.ai/docs/mcp-servers/).
 
+For a self-hosted project's `hosting` configuration, all three CLI hosts use the
+SDK stdio/HTTPS adapter and need only its access-token variable. API credentials
+remain on the server. Remote entries use `openmcp_remote_PROJECT_NAME`, preserving
+local entries. Desktop remote credential injection/OAuth is not automated.
+See [self-hosting](self-hosting.md) for preparation and verified TLS proof.
+
 ## What Connect changes
 
 The server name is `openmcp_PROJECT_NAME`. The command uses the current absolute

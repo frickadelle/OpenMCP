@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased — portable self-hosting
+
+- Add `h` / Self-host and `deploy` to prepare reusable Docker/Caddy packages for
+  a user's domain, with concrete DNS, environment and client setup instructions.
+- Add official-SDK stateless authenticated HTTP serving, Host/Origin checks,
+  request/connection bounds and shutdown cleanup. Keep stdio as the local default.
+- Add optional config `hosting` binding and a certificate-verified stdio/HTTPS
+  adapter. Remote host registrations use separate names and forward only the
+  access token; API credentials stay on the server. Redirects are refused.
+- Copy known runtime/config/spec files into a new folder, preserve explicit
+  selections, reject existing output folders and correct domain/localhost API
+  input in the wizard. Add no secret values or server-specific generated code.
+- Add real SDK HTTP/read/write, HTTPS-adapter and Docker/Caddy acceptance proof,
+  plus CI coverage for generated deployment. Public DNS/ACME issuance, domain
+  purchase, cloud provisioning, OAuth and Desktop remote setup remain untested
+  or unsupported; see the self-hosting guide.
+
 ## Unreleased — direct host setup and smoother build
 
 - Replace coarse frame increments with a 360 ms monotonic-clock build, eased

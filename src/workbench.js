@@ -2,7 +2,7 @@ import terminalKit from 'terminal-kit';
 import { resolve } from 'node:path';
 import { readProjects, sourceRows, toolsFor, toggleTool, updateSettings } from './workbench-store.js';
 import { assert, redact, UserError } from './errors.js';
-import { inspectHosts, connectHost } from './hosts.js';
+import { inspectHosts, connectHost, requiredHostEnv } from './hosts.js';
 import { diagnose } from './client.js';
 import { compileProject } from './importer.js';
 
@@ -157,7 +157,7 @@ export function frameLines(state, width, height) {
     put(content, height - 6, 'Enter: configure | t: test server | Esc: back', colors.muted, contentWidth);
   } else if (state.mode === 'help') {
     const help = ['A tool call is an API action.', 'Up/Down / j,k: move selection', 'Enter / Right: open tools or setup', 'Tab: switch pane. Left: MCP list',
-      'Space: toggle and save', 's: Settings   c: Connect   r: reload', 'n: New MCP  d: demo  q: quit dialog', 'Esc: back / cancel',
+      'Space: toggle and save', 's: Settings  c: Connect  h: Self-host', 'n: New MCP  d: demo  q: quit dialog', 'Esc: back / cancel',
       'Browsing never calls the API.', 'Reconnect clients after changes.'];
     const first = Math.max(0, Math.min(state.helpRow ?? 0, Math.max(0, help.length - (height - 13))));
     help.slice(first, first + height - 13).forEach((line, i) => put(content, 7 + i, line, colors.ink, contentWidth));
@@ -217,7 +217,7 @@ export function frameLines(state, width, height) {
   }
   put(2, height - 3, state.busy ? 'Working ...' : state.status, state.error ? colors.error : colors.muted);
   const shortcuts = state.mode === 'connect' ? '[Up/Down] Host [Enter] Set up [t] Test [Esc] Back [q] Quit' :
-    width >= 90 ? '[Enter] Open [Space] Toggle [c] Connect [s] Settings [r] Reload [n] New [d] Demo [?] [q] Quit' : '[Tab] Pane [Enter] Open [Space] Toggle [c] Connect [s] [?] [q]';
+    width >= 90 ? '[Enter] Open [Space] Toggle [c] Connect [s] Settings [h] Self-host [n] [d] [?] [q]' : '[Enter] Open [Space] Toggle [c] Connect [h] Deploy [s] [?] [q]';
   put(2, height - 2, shortcuts, colors.accent);
   return quitOverlay(lines, state, width, height);
 }
@@ -279,6 +279,7 @@ export async function runWorkbench({ directory = process.cwd(), configs = [], en
     if (quitKey(state, name)) { render(); return; }
     if (name === 'n') { stop({ action: 'create', directory: resolve(directory) }); return; }
     if (name === 'd') { stop({ action: 'demo', directory: resolve(directory) }); return; }
+    if (name === 'h' && project?.config) { stop({ action: 'deploy', configPath: project.path }); return; }
     if (name === '?') { state.mode = state.mode === 'help' ? 'browse' : 'help'; render(); return; }
     if (name === 'r') {
       await save(async () => { state.projects = await readProjects(resolve(directory), configs); state.rows = menuRows(state.projects); state.row = Math.min(state.row, Math.max(0, state.rows.length - 1)); transition(); state.progress = 1; state.status = 'Project configurations reloaded.'; }); return;
@@ -296,13 +297,13 @@ export async function runWorkbench({ directory = process.cwd(), configs = [], en
       if (name === 'ENTER') await save(async () => {
         const host = state.hosts[state.host]; await connectHost(host, project.path);
         state.hosts = await inspectHosts(project.path, project.config, { env });
-        const envs = [...new Set(project.config.sources.filter(s => s.auth.type !== 'none').map(s => s.auth.env))];
+        const envs = requiredHostEnv(project.config);
         state.status = `Configured for ${host.name}. Restart the host to load tools.${envs.length ? ` Host env: ${envs.join(', ')}.` : ''}`;
       });
       else if (name === 't') await save(async () => {
         const { selected } = await compileProject(project.config, project.directory);
         const result = await diagnose(project.config, project.path, selected, { env });
-        state.status = `Local server tested: ${result.tools.length} tools listed. Host-session connection is not probed.`;
+        state.status = `${project.config.hosting ? 'Remote' : 'Local'} server tested: ${result.tools.length} tools listed. Host-session connection is not probed.`;
       });
       render(); return;
     }

@@ -6,14 +6,17 @@ import { credentials } from './http.js';
 import { assert, UserError } from './errors.js';
 
 export const cliPath = fileURLToPath(new URL('./cli.js', import.meta.url));
-export function exportClient(configPath, name) {
-  return { mcpServers: { [name]: { type: 'stdio', command: process.execPath, args: [cliPath, 'serve', '--config', resolve(configPath)] } } };
+export function exportClient(configPath, name, hosting) {
+  return { mcpServers: { [name]: { type: 'stdio', command: process.execPath,
+    args: hosting ? [cliPath, 'bridge', '--url', hosting.publicUrl, '--token-env', hosting.tokenEnv] : [cliPath, 'serve', '--config', resolve(configPath)] } } };
 }
 export async function diagnose(config, configPath, selected, { probe, args = {}, env = process.env } = {}) {
-  credentials(config, env);
+  if (config.hosting) assert(Boolean(env[config.hosting.tokenEnv]), `Set ${config.hosting.tokenEnv} in the client environment.`);
+  else credentials(config, env);
   const forwarded = {};
-  for (const source of config.sources) if (source.auth.type !== 'none') forwarded[source.auth.env] = env[source.auth.env];
-  const entry = exportClient(configPath, config.name).mcpServers[config.name];
+  if (config.hosting) forwarded[config.hosting.tokenEnv] = env[config.hosting.tokenEnv];
+  else for (const source of config.sources) if (source.auth.type !== 'none') forwarded[source.auth.env] = env[source.auth.env];
+  const entry = exportClient(configPath, config.name, config.hosting).mcpServers[config.name];
   const transport = new StdioClientTransport({ ...entry, env: forwarded, stderr: 'pipe' });
   // Do not echo arbitrary child logs; report safe diagnostics instead.
   transport.stderr.on('data', () => {});
