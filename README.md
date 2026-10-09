@@ -41,24 +41,33 @@ tool borders in place, then reveals their content. Names and boxes stay fixed;
 there is no sliding or idle pulsing. Opening the tools with Enter does not
 restart the build. The UI uses the terminal's default background and text color.
 Browsing does not call the API or claim to show live traffic. The left footer
-shows the selected source position and total count. A single-source list has
-no further entries; press `n` to create another project. Use Left/Tab to return
-from tools to MCP navigation.
+shows the selected menu position and total count. Each project entry labels its
+source as `API: name`; that line belongs to the project, rather than being a
+second selectable MCP. **New MCP** and **Try local demo** are separate selectable
+setup actions, even when only one project exists. Use Left/Tab to return from
+tools to MCP navigation. Dashboard, wizard and tour text use English.
 
 | Key | Action |
 | --- | --- |
 | Up/Down or `j`/`k` | Move within the focused list; stop at its first/last entry |
 | Mouse wheel | Move within the list beneath the pointer (terminal mouse reporting required) |
 | Click | Focus a list and select a visible entry; never toggle or call a tool |
-| Enter / Right | Open the selected MCP's tools |
+| Enter / Right | Open tools, or start the selected setup action |
 | Tab / Shift+Tab | Switch panes |
 | Left / Esc | Return to the MCP list |
 | Space | Enable/disable the selected tool and save its configuration |
 | `s` | Open source settings: base URL, auth, credential variable name, timeout |
 | `r` | Reload project files after external edits |
 | `n` | Create another project through the wizard, then return to the dashboard |
+| `d` | Set up the local Notes demo, with explicit tool selection |
 | `?` | Explain shortcuts and the meaning of toolcalls |
-| `q` / Ctrl+C | Restore the terminal and exit |
+| `q` / `Q` | Open **Do you really want to quit?**; Cancel is selected by default |
+| Ctrl+C | Restore the terminal and exit immediately |
+
+In the quit popup, Tab/arrows switch between **Cancel** and **Quit**, Enter
+confirms, and Esc cancels. `y` confirms quitting and `n` cancels. Cancelling
+preserves the selected project/tool and settings form. Saved changes remain on
+disk; the popup blocks navigation and tool switches until dismissed.
 
 Settings have an explicit **Save** entry, visible even in short terminals. Use
 Up/Down in help to scroll its explanation. Enter edits a field; Enter again accepts
@@ -110,10 +119,15 @@ endpoints from a website or invent them. Writes, query/header inputs and body
 schemas remain available through `add` or a manual config.
 
 The final summary gives the saved file and selected tool count. Client connection
-instructions are optional through **Zeig mir, wie ich meinen Client verbinde**.
-Choose **Zur MCP-Uebersicht** to return to the refreshed dashboard. Creating a
+instructions are optional through **Show me how to connect my client**.
+Choose **Back to MCP overview** to return to the refreshed dashboard. Creating a
 config does not start an API or connect a client. Outside the dashboard, use
 `openmcp init`; an explicit `--config` remains available for scripts.
+
+For the shortest sample setup, select **Try local demo** or press `d`. It uses
+the bundled Notes OpenAPI file, a project named `demo` and no credentials. You
+still choose the exposed tools before saving. An existing `demo.yaml` receives
+a numbered alternative; the sample API still needs to be started separately.
 
 ## Start from a fresh checkout
 

@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased — menu navigation and quit confirmation
+
+- Label project sources as `API: name` and add selectable New MCP / Try local
+  demo actions, so a single-project menu still has keyboard navigation targets.
+- Let demo setup reuse the bundled spec and public auth while preserving explicit
+  tool selection, safe filenames and return to the refreshed dashboard.
+- Confirm `q`/`Q` in an ASCII popup with Cancel selected by default. Support
+  Tab/arrows/Enter, Esc cancellation and y/n; preserve the current view on cancel.
+- Use English throughout dashboard, settings, wizard, client guidance and tour.
+  Ctrl+C remains an immediate exit; saved changes persist independently of quit.
+
 ## Unreleased — simpler setup
 
 - Start interactive setup with MCP name and an OpenAPI-file question; derive the

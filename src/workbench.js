@@ -5,24 +5,29 @@ import { assert, redact, UserError } from './errors.js';
 
 const clean = value => String(value ?? '').replace(/[\x00-\x1f\x7f-\x9f]/g, ' ').trim();
 const colors = { ink: 'default', muted: 'gray', accent: 'cyan', on: 'green', error: 'red' };
-const settingFields = ['API-Adresse', 'Auth-Art', 'Variablenname', 'API-Key Position', 'API-Key Name', 'Timeout (ms)', 'Animationen (Sitzung)', 'Speichern'];
+const settingFields = ['API URL', 'Auth type', 'Environment variable', 'API-key location', 'API-key name', 'Timeout (ms)', 'Animations (session)', 'Save'];
+const menuRows = projects => [...sourceRows(projects),
+  { action: 'create', title: 'New MCP', detail: 'Connect your API' },
+  { action: 'demo', title: 'Try local demo', detail: 'Set up sample API' }
+];
 export function formFor(project, sourceId, motion) {
   const source = project.config.sources.find(s => s.id === sourceId);
   return { baseUrl: source.baseUrl, auth: { ...source.auth }, timeoutMs: project.config.timeoutMs ?? 10000, motion };
 }
 export function createViewState(projects, motion = true) {
-  return { projects, rows: sourceRows(projects), row: 0, tool: 0, pane: 'mcps', mode: 'browse', motion,
-    progress: 1, status: sourceRows(projects).length === 1 ? 'Eine API-Quelle vorhanden. [n] legt ein weiteres MCP-Projekt an.' : 'Pfeile waehlen eine MCP-Quelle. Enter oeffnet ihre Tools.', busy: false, field: 0 };
+  return { projects, rows: menuRows(projects), row: 0, tool: 0, pane: 'mcps', mode: 'browse', motion,
+    progress: 1, status: sourceRows(projects).length === 1 ? 'One API source. Use Down for New MCP or Try local demo.' : 'Up/Down: choose a project or setup action. Enter: open.', busy: false, field: 0, quit: undefined };
 }
 export function openToolPane(state) {
+  if (state.rows[state.row]?.action) return;
   if (state.pane === 'tools') return;
   state.pane = 'tools';
-  state.status = 'Pfeile waehlen ein Tool. Space schaltet es an oder aus.';
+  state.status = 'Up/Down: choose a tool. Space: toggle. Left: back to MCPs.';
 }
 export function selectMcp(state, index) {
   const next = Math.max(0, Math.min(state.rows.length - 1, index));
   if (!state.rows.length || next === state.row) return false;
-  state.row = next; state.tool = 0; state.progress = state.motion ? 0 : 1;
+  state.row = next; state.tool = 0; state.progress = state.motion && !state.rows[next].action ? 0 : 1;
   return true;
 }
 export function moveSelection(state, direction) {
@@ -33,7 +38,7 @@ export function moveSelection(state, direction) {
   state.tool = next; return true;
 }
 export function listMouse(state, name, data, width, height) {
-  if (state.busy || state.mode !== 'browse' || state.editor || width < 64 || height < 18) return false;
+  if (state.busy || state.mode !== 'browse' || state.editor || state.quit || width < 64 || height < 18) return false;
   const x = data.x - 1; const y = data.y - 1;
   const left = Math.min(32, Math.floor(width * 0.3));
   if (y < 6 || y >= height - 5) return false;
@@ -57,7 +62,7 @@ export function listMouse(state, name, data, width, height) {
   return changed;
 }
 export function advanceBuild(state) {
-  if (!state.motion || state.mode !== 'browse' || state.progress >= 1) return false;
+  if (!state.motion || state.quit || state.mode !== 'browse' || state.progress >= 1) return false;
   state.progress = Math.min(1, state.progress + 0.12);
   return true;
 }
@@ -65,13 +70,42 @@ const active = state => {
   const row = state.rows[state.row]; const project = row && state.projects[row.projectIndex];
   return { row, project, tools: project && row?.sourceId ? toolsFor(project, row.sourceId) : [] };
 };
+export function quitKey(state, name) {
+  if (!state.quit) {
+    if (!['q', 'Q'].includes(name)) return false;
+    state.quit = { confirm: false };
+  } else if (['ESCAPE', 'n', 'N', 'q', 'Q'].includes(name)) state.quit = undefined;
+  else if (['TAB', 'SHIFT_TAB', 'LEFT', 'RIGHT', 'UP', 'DOWN'].includes(name)) state.quit.confirm = !state.quit.confirm;
+  else if (['y', 'Y'].includes(name)) return 'exit';
+  else if (name === 'ENTER') {
+    if (state.quit.confirm) return 'exit';
+    state.quit = undefined;
+  }
+  return true;
+}
+function quitOverlay(lines, state, width, height) {
+  if (!state.quit) return lines;
+  const w = Math.min(48, width - 2); const h = Math.min(8, height);
+  if (w < 8 || h < 6) return [{ x: 0, y: 0, text: 'Quit? y/n'.slice(0, width) }];
+  const x = Math.floor((width - w) / 2); const y = Math.floor((height - h) / 2);
+  // Clear the covered region without splitting an underlying ASCII frame.
+  const visible = lines.filter(l => l.y < y || l.y >= y + h || l.x + l.text.length <= x || l.x >= x + w);
+  const rows = Array.from({ length: h }, () => `|${' '.repeat(w - 2)}|`);
+  rows[0] = `+${'-'.repeat(w - 2)}+`; rows[h - 1] = rows[0];
+  const text = (row, value) => { rows[row] = `| ${value.slice(0, w - 4).padEnd(w - 4)} |`; };
+  text(1, 'Do you really want to quit?');
+  text(2, 'Saved changes will be kept.');
+  text(h - 3, state.quit.confirm ? '  [ Cancel ]     > [ Quit ]' : '> [ Cancel ]       [ Quit ]');
+  text(h - 2, 'Tab: choose  Enter: confirm  Esc: cancel');
+  return [...visible, ...rows.map((text, i) => ({ x, y: y + i, text, color: colors.accent }))];
+}
 export function frameLines(state, width, height) {
   const { row, project, tools } = active(state);
-  if (width < 64 || height < 18) return [
+  if (width < 64 || height < 18) return quitOverlay([
     { x: 2, y: 2, text: 'OPEN MCP', color: 'cyan' },
-    { x: 2, y: 4, text: 'Bitte Terminal auf mindestens 64 x 18 vergroessern.' },
-    { x: 2, y: 6, text: 'q / Ctrl+C = schliessen' }
-  ];
+    { x: 2, y: 4, text: 'Resize your terminal to at least 64 x 18.' },
+    { x: 2, y: 6, text: 'q: quit dialog / Ctrl+C: exit' }
+  ], state, width, height);
   const left = Math.min(32, Math.floor(width * 0.3)); const right = left + 2;
   const lines = [];
   const put = (x, y, text, color = colors.ink, max = width - x - 1, bold = false) => {
@@ -91,32 +125,28 @@ export function frameLines(state, width, height) {
   const content = right + 2;
   const contentWidth = panelWidth - 4;
   put(2, 1, 'OPEN MCP', colors.accent, width - 4, true);
-  put(12, 1, '/ API-Aktionen als MCP-Tools', colors.muted);
+  put(12, 1, '/ API actions as MCP tools', colors.muted);
   if (row) put(2, 3, row.title, colors.accent, left - 3, true);
-  box(2, 5, left - 2, height - 9, 'DEINE MCPs', state.pane === 'mcps' ? colors.accent : colors.muted);
+  box(2, 5, left - 2, height - 9, 'YOUR MCPs', state.pane === 'mcps' ? colors.accent : colors.muted);
   const visibleRows = Math.max(1, Math.floor((height - 12) / 3)); const firstRow = Math.max(0, state.row - visibleRows + 1);
   state.rows.slice(firstRow, firstRow + visibleRows).forEach((item, i) => {
     const selected = firstRow + i === state.row;
     put(4, 7 + i * 3, `${selected ? '>' : ' '} ${item.projectName ?? item.title}`, selected ? colors.accent : colors.ink, left - 6, selected);
-    if (item.sourceId) put(6, 8 + i * 3, item.sourceId, colors.ink, left - 8);
+    put(6, 8 + i * 3, item.sourceId ? `API: ${item.sourceId}` : item.detail ?? '', colors.muted, left - 8);
   });
-  put(4, height - 6, `${state.rows.length ? state.row + 1 : 0}/${state.rows.length} | n: neu`, colors.muted, left - 6);
-  const label = state.mode === 'settings' ? 'SETTINGS' : state.mode === 'help' ? 'HILFE' : 'TOOLCALLS';
+  put(4, height - 6, `${state.rows.length ? state.row + 1 : 0}/${state.rows.length} | n: new`, colors.muted, left - 6);
+  const label = state.mode === 'settings' ? 'SETTINGS' : state.mode === 'help' ? 'HELP' : 'TOOLCALLS';
   box(right, 5, panelWidth, height - 9, label, state.pane === 'tools' || state.mode !== 'browse' ? colors.accent : colors.muted);
-  if (!state.rows.length) {
-    put(content, 7, 'Noch kein MCP-Projekt gefunden.', colors.accent, contentWidth);
-    put(content, 9, '[n] Neues Projekt anlegen', colors.ink, contentWidth);
-    put(content, 11, 'Ordner: openmcp --projects /pfad', colors.muted, contentWidth);
-  } else if (state.mode === 'help') {
-    const help = ['Toolcall = eine API-Aktion.', 'Pfeile / j,k: Auswahl bewegen', 'Enter / Rechts: Tools oeffnen', 'Tab / Links: Spalte wechseln',
-      'Space: an/aus + speichern', 's: Einstellungen   r: neu laden', 'n: neues Projekt   q: beenden', 'Esc: zurueck / abbrechen',
-      'Beim Browsen wird keine API aufgerufen.', 'Clients nach Aenderungen neu verbinden.'];
+  if (state.mode === 'help') {
+    const help = ['A tool call is an API action.', 'Up/Down / j,k: move selection', 'Enter / Right: open tools or setup', 'Tab: switch pane. Left: MCP list',
+      'Space: toggle and save', 's: Settings   r: reload', 'n: New MCP  d: demo  q: quit dialog', 'Esc: back / cancel',
+      'Browsing never calls the API.', 'Reconnect clients after changes.'];
     const first = Math.max(0, Math.min(state.helpRow ?? 0, Math.max(0, help.length - (height - 13))));
     help.slice(first, first + height - 13).forEach((line, i) => put(content, 7 + i, line, colors.ink, contentWidth));
-    put(content, height - 6, 'Pfeile: scrollen | Esc: zurueck', colors.muted, contentWidth);
+    put(content, height - 6, 'Up/Down: scroll | Esc: back', colors.muted, contentWidth);
   } else if (state.mode === 'settings' && state.form) {
-    const values = [state.form.baseUrl, state.form.auth.type, state.form.auth.env ?? '(nicht benoetigt)',
-      state.form.auth.in ?? 'header', state.form.auth.name ?? 'X-API-Key', state.form.timeoutMs, state.form.motion ? 'AN' : 'AUS'];
+    const values = [state.form.baseUrl, state.form.auth.type, state.form.auth.env ?? '(not required)',
+      state.form.auth.in ?? 'header', state.form.auth.name ?? 'X-API-Key', state.form.timeoutMs, state.form.motion ? 'ON' : 'OFF'];
     if (!state.editor) {
       const spacing = height >= 28 ? 2 : 1;
       const count = Math.min(7, Math.floor((height - 14) / spacing));
@@ -126,9 +156,14 @@ export function frameLines(state, width, height) {
         put(content, y, `${state.field === index ? '>' : ' '} ${label}${spacing === 1 ? `: ${values[index]}` : ''}`, state.field === index ? colors.accent : colors.ink, contentWidth);
         if (spacing === 2) put(content + 2, y + 1, values[index], colors.muted, contentWidth - 2);
       });
-      put(content, height - 7, `${state.field === 7 ? '>' : ' '} [ Speichern ]`, state.field === 7 ? colors.accent : colors.ink, contentWidth);
-      put(content, height - 6, 'Enter: bearbeiten | Esc: zurueck', colors.muted, contentWidth);
+      put(content, height - 7, `${state.field === 7 ? '>' : ' '} [ Save ]`, state.field === 7 ? colors.accent : colors.ink, contentWidth);
+      put(content, height - 6, 'Enter: edit | Esc: back', colors.muted, contentWidth);
     }
+  } else if (row?.action) {
+    put(content, 7, row.title, colors.accent, contentWidth);
+    put(content, 9, row.action === 'demo' ? 'Create a project for the sample Notes API.' : 'Connect an API using an OpenAPI file or a GET endpoint.', colors.ink, contentWidth);
+    put(content, 11, 'Enter: start setup. You choose which tools to enable.', colors.ink, contentWidth);
+    if (height >= 22) put(content, 13, 'No API calls are made during setup.', colors.muted, contentWidth);
   } else {
     if (!project.config) put(content, 7, project.error, colors.error, contentWidth);
     else {
@@ -149,23 +184,23 @@ export function frameLines(state, width, height) {
         put(x + 2, y + 1, tool.name, focused ? colors.accent : colors.ink, Math.max(0, switchX - x - 3), focused);
         put(switchX, y + 1, status, tool.error ? colors.error : tool.enabled ? colors.on : colors.muted, status.length, true);
         put(x + 2, y + 2, `${tool.method} ${tool.path}`, colors.ink, w - 4);
-        put(x + 2, y + 3, tool.error ?? tool.description ?? 'API-Aktion', tool.error ? colors.error : colors.ink, w - 4);
+        put(x + 2, y + 3, tool.error ?? tool.description ?? 'API action', tool.error ? colors.error : colors.ink, w - 4);
       });
-      if (!tools.length) put(content, 7, 'Keine Tools. [s] Einstellungen', colors.muted, contentWidth);
-      put(content, height - 6, `${tools.filter(t => t.enabled).length}/${tools.length} aktiv | ${tools.length ? state.tool + 1 : 0}/${tools.length} | Space: an/aus`, colors.muted, contentWidth);
+      if (!tools.length) put(content, 7, 'No tools. [s] Settings', colors.muted, contentWidth);
+      put(content, height - 6, `${tools.filter(t => t.enabled).length}/${tools.length} enabled | ${tools.length ? state.tool + 1 : 0}/${tools.length} | Space: toggle`, colors.muted, contentWidth);
     }
   }
   if (state.editor) {
-    put(content, height - 9, `EINGABE: ${settingFields[state.editor.field]}`, colors.accent, contentWidth);
+    put(content, height - 9, `INPUT: ${settingFields[state.editor.field]}`, colors.accent, contentWidth);
     put(content, height - 8, `${state.editor.value.slice(-Math.max(1, contentWidth - 1))}_`, colors.ink, contentWidth);
-    put(content, height - 7, 'Enter: uebernehmen | Esc: abbrechen', colors.muted, contentWidth);
+    put(content, height - 7, 'Enter: apply | Esc: cancel', colors.muted, contentWidth);
   }
-  put(2, height - 3, state.busy ? 'Speichere und validiere ...' : state.status, state.error ? colors.error : colors.muted);
-  put(2, height - 2, width >= 90 ? '[Enter] Tools  [Space] an/aus  [s] Settings  [r] Reload  [n] Neu  [?] Hilfe  [q] Ende' : '[Tab] Spalte [Enter] Tools [Space] an/aus [n] Neu [s] [?] [q]', colors.accent);
-  return lines;
+  put(2, height - 3, state.busy ? 'Saving and validating ...' : state.status, state.error ? colors.error : colors.muted);
+  put(2, height - 2, width >= 90 ? '[Enter] Open  [Space] Toggle  [s] Settings  [r] Reload  [n] New  [d] Demo  [?] Help  [q] Quit' : '[Tab] Pane [Enter] Open [Space] Toggle [n] [d] [s] [?] [q]', colors.accent);
+  return quitOverlay(lines, state, width, height);
 }
 export async function runWorkbench({ directory = process.cwd(), configs = [], env = process.env } = {}) {
-  assert(process.stdin.isTTY && process.stdout.isTTY && process.env.TERM !== 'dumb', 'openmcp braucht ein interaktives Terminal. Nutze --help fuer die bisherigen CLI-Befehle.');
+  assert(process.stdin.isTTY && process.stdout.isTTY && process.env.TERM !== 'dumb', 'openmcp requires an interactive terminal. Use --help for CLI commands.');
   const projects = await readProjects(resolve(directory), configs);
   const motion = !env.OPEN_MCP_NO_ANIMATION && !env.CI;
   const state = createViewState(projects, motion);
@@ -180,7 +215,7 @@ export async function runWorkbench({ directory = process.cwd(), configs = [], en
     screen.fill({ attr: { color: 'default', bgColor: 'default' } });
     for (const line of frameLines(state, term.width, term.height)) screen.put({ x: line.x, y: line.y, attr: { color: line.color ?? 'default', bgColor: 'default', bold: Boolean(line.bold) }, wrap: false, markup: false }, line.text);
     screen.draw({ delta: true });
-    if (!timer && state.motion && state.mode === 'browse' && state.progress < 1) {
+    if (!timer && !state.quit && state.motion && state.mode === 'browse' && state.progress < 1) {
       timer = setTimeout(() => { timer = undefined; if (advanceBuild(state)) render(); }, 45);
     }
   };
@@ -188,7 +223,7 @@ export async function runWorkbench({ directory = process.cwd(), configs = [], en
   const stop = action => { if (stopped) return; stopped = true; finish(action); };
   const safeError = error => {
     const secrets = state.projects.flatMap(p => p.config?.sources.filter(s => s.auth.type !== 'none').map(s => env[s.auth.env]) ?? []);
-    state.status = redact(error instanceof UserError ? error.message : 'Aktion fehlgeschlagen. Pruefe validate oder lade mit r neu.', secrets); state.error = true;
+    state.status = redact(error instanceof UserError ? error.message : 'Action failed. Run validate or press r to reload.', secrets); state.error = true;
   };
   const save = async action => {
     state.busy = true; state.error = false; render();
@@ -199,6 +234,10 @@ export async function runWorkbench({ directory = process.cwd(), configs = [], en
   const onKey = async (name, matches, data) => {
     if (name === 'CTRL_C') { if (state.busy) state.exitRequested = true; else stop(); return; }
     if (state.busy || stopped) return;
+    if (state.quit) {
+      if (quitKey(state, name) === 'exit') stop(); else render();
+      return;
+    }
     const { row, project, tools } = active(state);
     if (state.editor) {
       if (name === 'ESCAPE') state.editor = undefined;
@@ -214,16 +253,17 @@ export async function runWorkbench({ directory = process.cwd(), configs = [], en
       } else if (data?.isCharacter && state.editor.value.length < 2048) state.editor.value += name;
       render(); return;
     }
-    if (name === 'q') { stop(); return; }
+    if (quitKey(state, name)) { render(); return; }
     if (name === 'n') { stop({ action: 'create', directory: resolve(directory) }); return; }
+    if (name === 'd') { stop({ action: 'demo', directory: resolve(directory) }); return; }
     if (name === '?') { state.mode = state.mode === 'help' ? 'browse' : 'help'; render(); return; }
     if (name === 'r') {
-      await save(async () => { state.projects = await readProjects(resolve(directory), configs); state.rows = sourceRows(state.projects); state.row = Math.min(state.row, Math.max(0, state.rows.length - 1)); transition(); state.progress = 1; state.status = 'Projektkonfigurationen neu geladen.'; }); return;
+      await save(async () => { state.projects = await readProjects(resolve(directory), configs); state.rows = menuRows(state.projects); state.row = Math.min(state.row, Math.max(0, state.rows.length - 1)); transition(); state.progress = 1; state.status = 'Project configurations reloaded.'; }); return;
     }
     if (name === 'ESCAPE') { state.mode = 'browse'; state.pane = 'mcps'; state.editor = undefined; render(); return; }
     if (name === 's' && project?.config) {
       if (state.mode === 'settings') state.mode = 'browse';
-      else { state.mode = 'settings'; state.form = formFor(project, row.sourceId, state.motion); state.field = 0; state.status = 'Enter bearbeitet. Zum Speichern den letzten Eintrag waehlen.'; }
+      else { state.mode = 'settings'; state.form = formFor(project, row.sourceId, state.motion); state.field = 0; state.status = 'Enter: edit. Choose Save to persist changes.'; }
       render(); return;
     }
     if (state.mode === 'settings') {
@@ -238,10 +278,10 @@ export async function runWorkbench({ directory = process.cwd(), configs = [], en
         else if (state.field === 7) await save(async () => {
           const auth = state.form.auth.type === 'none' ? { type: 'none' } : state.form.auth.type === 'bearer' ? { type: 'bearer', env: state.form.auth.env } : { ...state.form.auth };
           state.projects[row.projectIndex] = await updateSettings(project, row.sourceId, { ...state.form, auth });
-          state.mode = 'browse'; state.status = 'Settings gespeichert. Client neu verbinden.';
+          state.mode = 'browse'; state.status = 'Settings saved. Reconnect your client.';
         });
         else if ([0, 2, 4, 5].includes(state.field)) {
-          if ((state.field === 2 && state.form.auth.type === 'none') || (state.field === 4 && state.form.auth.type !== 'apiKey')) state.status = 'Dieses Feld wird fuer die gewaehlte Auth-Art nicht benoetigt.';
+          if ((state.field === 2 && state.form.auth.type === 'none') || (state.field === 4 && state.form.auth.type !== 'apiKey')) state.status = 'This field is not needed for the selected auth type.';
           else state.editor = { field: state.field, value: String([state.form.baseUrl, '', state.form.auth.env ?? '', '', state.form.auth.name ?? '', state.form.timeoutMs][state.field]) };
         }
       }
@@ -253,14 +293,17 @@ export async function runWorkbench({ directory = process.cwd(), configs = [], en
       render(); return;
     }
     if (name === 'TAB' || name === 'SHIFT_TAB') state.pane = state.pane === 'mcps' ? 'tools' : 'mcps';
-    if (name === 'LEFT') { state.pane = 'mcps'; state.status = 'Pfeile / Mausrad waehlen eine Quelle. [n] legt ein neues Projekt an.'; }
-    if (name === 'RIGHT' || name === 'ENTER') openToolPane(state);
+    if (name === 'LEFT') { state.pane = 'mcps'; state.status = 'Up/Down or mouse wheel: choose an MCP. Enter: open.'; }
+    if (name === 'RIGHT' || name === 'ENTER') {
+      if (state.pane === 'mcps' && row?.action) { stop({ action: row.action, directory: resolve(directory) }); return; }
+      openToolPane(state);
+    }
     if (name === 'UP' || name === 'k' || name === 'DOWN' || name === 'j') {
       moveSelection(state, name === 'UP' || name === 'k' ? -1 : 1);
     }
     if (name === ' ' && state.pane === 'tools' && tools[state.tool]) await save(async () => {
       state.projects[row.projectIndex] = await toggleTool(project, row.sourceId, tools[state.tool].operation);
-      state.status = `${tools[state.tool].name} ${tools[state.tool].enabled ? 'ausgeschaltet' : 'eingeschaltet'} und gespeichert. Client neu verbinden.`;
+      state.status = `${tools[state.tool].name} ${tools[state.tool].enabled ? 'disabled' : 'enabled'} and saved. Reconnect your client.`;
     });
     render();
   };

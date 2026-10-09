@@ -3,23 +3,23 @@ import { banner, chapter, explain } from './ui.js';
 
 export async function tour() {
   await banner();
-  explain('Gefuehrte Vorschau', ['Diese Tour erklaert den Ablauf. Sie legt keine Datei an und ruft keine API auf.']);
+  explain('Guided preview', ['This tour explains the flow. It creates no files and makes no API calls.']);
   const chapters = [
-    ['API importieren', ['OpenAPI ist der Bauplan deiner API: URLs, Parameter und Aktionen.',
-      'Open MCP liest eine JSON- oder YAML-Datei mit diesem Bauplan.', 'Ohne Bauplan kannst du einzelne REST-Endpunkte manuell eingeben.'], 'import'],
-    ['Tools auswaehlen', ['Ein API-Endpunkt wird zu einem benannten Tool.', 'Beispiel: GET /notes/{id} wird "demo_getNote".',
-      'Du markierst die Tools mit der Leertaste. Unmarkierte bleiben verborgen.'], 'tools'],
-    ['Zugang einstellen', ['Eine oeffentliche API braucht keinen Schluessel.', 'Bei einer privaten API traegst du den NAMEN einer Umgebungsvariable ein.',
-      'Der echte Token bleibt in deiner Umgebung. Die Konfig enthaelt ihn nicht.'], 'auth'],
-    ['Lokal starten', ['open-mcp.yaml speichert Quellen, Zugangsnamen und deine Tool-Auswahl.',
-      'Ein Diagnosebefehl testet, ob der lokale MCP-Server funktioniert.', 'Der Beispiel-API-Server muss separat laufen; das erklaert der Wizard am Ende.'], 'local'],
-    ['Client verbinden', ['Der Client ist das Programm, das Tools auflistet und aufruft.', 'Zum Testen verwenden wir MCP Inspector. Er braucht kein LLM-Konto.',
-      'Export erzeugt seine Startkonfig. Der Inspector startet Open MCP dann selbst.'], 'client']
+    ['Import API', ['OpenAPI describes your API: URLs, parameters and actions.',
+      'Open MCP reads a JSON or YAML file with that description.', 'Without a spec, define individual REST endpoints manually.'], 'import'],
+    ['Choose tools', ['An API endpoint becomes a named tool.', 'Example: GET /notes/{id} becomes "demo_getNote".',
+      'Select tools with Space. Unselected actions stay hidden.'], 'tools'],
+    ['Set up authentication', ['A public API needs no credential.', 'For a private API, enter the NAME of an environment variable.',
+      'The actual token stays in your environment. It is never saved in the configuration.'], 'auth'],
+    ['Start locally', ['open-mcp.yaml stores sources, credential names and your tool selection.',
+      'The doctor command tests whether the local MCP server works.', 'The example API must run separately; the wizard explains how at the end.'], 'local'],
+    ['Connect client', ['The client is the program that lists and calls tools.', 'We test with MCP Inspector. It needs no LLM account.',
+      'Export creates its launch configuration. Inspector then starts Open MCP itself.'], 'client']
   ];
   for (const [i, [title, lines, scene]] of chapters.entries()) {
     await chapter(i + 1, title, lines, scene);
-    if (process.stdin.isTTY) await input({ message: i === 4 ? 'Enter zum Abschluss' : 'Enter fuer den naechsten Schritt' });
+    if (process.stdin.isTTY) await input({ message: i === 4 ? 'Press Enter to finish' : 'Press Enter for the next step' });
   }
-  explain('Jetzt selbst ausprobieren', ['Starte: npm run onboard', 'Waehle den lokalen Beispiel-Import. Der Wizard zeigt die naechsten Befehle.',
-    'Falls schon eine Konfig existiert: node src/cli.js init --config mein-neues-projekt.yaml']);
+  explain('Try it yourself', ['Start: npm run onboard', 'Choose the local example. The wizard shows the next commands.',
+    'If a configuration already exists: node src/cli.js init --config my-new-project.yaml']);
 }

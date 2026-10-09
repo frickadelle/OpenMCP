@@ -18,10 +18,11 @@ async function browse(options = {}) {
   let configs = options.config ? (Array.isArray(options.config) ? options.config : [options.config]) : [];
   while (true) {
     const action = await runWorkbench({ directory, configs });
-    if (action?.action !== 'create') return;
+    if (!['create', 'demo'].includes(action?.action)) return;
     let path;
     try {
-      const result = await initialize(undefined, { directory, simple: true });
+      const result = await initialize(undefined, { directory, simple: true,
+        ...(action.action === 'demo' ? { name: 'demo', demo: true, auth: 'none' } : {}) });
       path = result.path;
       await finishOnboarding(result, true);
     } catch (error) {
