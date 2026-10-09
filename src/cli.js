@@ -2,6 +2,7 @@
 import { Command } from 'commander';
 import { loadConfig, saveConfig, validateConfig } from './config.js';
 import { compileProject } from './importer.js';
+import { tour } from './tour.js';
 import { initialize, addSource, selectTools } from './wizard.js';
 import { serve } from './server.js';
 import { exportClient, diagnose } from './client.js';
@@ -9,6 +10,7 @@ import { busy, ribbon } from './ui.js';
 import { UserError, assert, redact } from './errors.js';
 
 const program = new Command().name('open-mcp').version('0.1.0').description('Open MCP (working title): local HTTP APIs as selected MCP tools');
+program.command('tour').description('Explain the five onboarding steps with animated ASCII diagrams').action(tour);
 const configOption = command => command.option('-c, --config <path>', 'Project JSON/YAML file', 'open-mcp.yaml');
 const sourceOptions = command => command.option('--spec <path>', 'Local OpenAPI JSON/YAML file').option('--id <id>', 'Source id')
   .option('--base-url <url>', 'Override API base URL').option('--auth <type>', 'none, bearer or apiKey')

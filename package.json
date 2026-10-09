@@ -17,7 +17,9 @@
     "test:client": "node --test --test-timeout=30000 test/inspector.test.js",
     "check": "node scripts/check.js",
     "demo": "node examples/api.js",
-    "smoke": "node scripts/smoke.js"
+    "smoke": "node scripts/smoke.js",
+    "onboard": "node src/cli.js init",
+    "tour": "node src/cli.js tour"
   },
   "dependencies": {
     "@apidevtools/swagger-parser": "^12.1.0",

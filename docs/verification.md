@@ -1,13 +1,28 @@
 # Verification evidence
 
 Verified locally on **2026-10-09**, macOS, Node **22.23.2**, npm **10.9.8**.
-This is a local MVP result, not a public release or a remote CI result.
+The repository is now on GitHub with private visibility. No public/npm release
+has been made.
+
+## Guided onboarding update
+
+- `npm run check` passed. The updated local suite has **58 passed, 0 failed,
+  0 skipped** tests, including tour side effects, clean stdout in pipes and
+  accurate next commands for demo/custom API URLs.
+- The recommended local-example wizard completed through all five chapters in
+  a PTY with TERM=xterm. Both read/write tools were explicitly selected and
+  the output configuration passed strict validation.
+- The initial GitHub MVP CI passed on Linux with Node 22 and Node 24:
+  [CI run](https://github.com/frickadelle/OpenMCP/actions/runs/37983619237).
+  That run tested the baseline MVP; the onboarding commit will run the same CI.
+
+## Initial MVP evidence
 
 | Check | Observed result |
 | --- | --- |
 | `npm run check` | Passed all source/test/example/script syntax checks |
-| `npm test` on final source | **55 passed, 0 failed, 0 skipped**, approximately 3.63 seconds |
-| `npm run smoke` on final source | Passed, **1.916 seconds** with dependencies already installed |
+| `npm test` on baseline MVP | **55 passed, 0 failed, 0 skipped**, approximately 3.63 seconds |
+| `npm run smoke` on baseline MVP | Passed, **1.916 seconds** with dependencies already installed |
 | `validate --strict` on OpenAPI/manual/multi/auth examples | All four passed, zero unsupported operations |
 | `npm audit --omit=dev --json` | 0 known vulnerabilities at the check time |
 | `npm audit --json` | 0 known vulnerabilities at the check time |
@@ -17,8 +32,8 @@ This is a local MVP result, not a public release or a remote CI result.
 
 The initial dependency installation used the npm registry. The clean-clone install
 used the same lockfile and a populated local package cache; it does not measure
-first-install internet/download latency. Node 24 and Linux are configured in CI
-but have not been executed remotely from this unpublished local repository.
+first-install internet/download latency. The baseline MVP also passed GitHub CI on Linux with Node 22 and Node 24,
+as linked above.
 
 ## Protocol and HTTP proof
 

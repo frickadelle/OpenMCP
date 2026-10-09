@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — clearer onboarding
+
+- Added `tour` / `npm run tour`: five narrated ASCII chapters with moving packets.
+- Added `npm run onboard`, a recommended local example choice, and step explanations.
+- Moved explicit tool selection before auth in the wizard.
+- Added descriptive read/write choices, selected-tool reveals and concrete next commands.
+- Added German onboarding copy and examples for API plans, tools, credentials and clients.
+- Preserved non-interactive CLI flags and protocol-only serve stdout.
+- Uploaded the tested MVP to the private GitHub repository; public/npm release remains pending.
+
 ## 0.1.0 — unreleased local MVP
 
 - Added an interactive init/add wizard and explicit tool allowlist.
