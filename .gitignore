@@ -1,0 +1,9 @@
+node_modules/
+coverage/
+.env
+.env.*
+!.env.example
+*.tgz
+client.local.json
+open-mcp.yaml
+.DS_Store

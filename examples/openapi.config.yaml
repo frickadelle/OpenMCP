@@ -1,0 +1,16 @@
+version: 1
+name: notes-openapi
+timeoutMs: 5000
+sources:
+  - id: notes
+    baseUrl: http://127.0.0.1:3001
+    spec: openapi.yaml
+    auth: { type: none }
+tools:
+  - source: notes
+    operation: getNote
+    name: notes_get
+    description: Read a local demo note by id.
+  - source: notes
+    operation: createNote
+    name: notes_create

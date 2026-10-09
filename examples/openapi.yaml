@@ -1,0 +1,53 @@
+openapi: 3.0.3
+info:
+  title: Local Notes API
+  version: 1.0.0
+servers:
+  - url: http://127.0.0.1:3001
+paths:
+  /notes/{id}:
+    get:
+      operationId: getNote
+      summary: Get a note by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, minLength: 1 }
+        - name: verbose
+          in: query
+          schema: { type: boolean }
+      responses:
+        '200': { description: A note }
+        '404': { description: Note not found }
+  /notes:
+    get:
+      operationId: listNotes
+      summary: List notes filtered by tags
+      parameters:
+        - name: tag
+          in: query
+          style: form
+          explode: true
+          schema: { type: array, items: { type: string } }
+      responses:
+        '200': { description: Notes }
+    post:
+      operationId: createNote
+      summary: Create a note
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewNote'
+      responses:
+        '201': { description: Created note }
+components:
+  schemas:
+    NewNote:
+      type: object
+      properties:
+        title: { type: string, minLength: 1, maxLength: 200 }
+      required: [title]
+      additionalProperties: false

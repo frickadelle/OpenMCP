@@ -1,0 +1,39 @@
+version: 1
+name: notes-manual
+timeoutMs: 5000
+sources:
+  - id: notes
+    baseUrl: http://127.0.0.1:3001
+    auth: { type: none }
+    endpoints:
+      - id: read
+        method: GET
+        path: /notes/{id}
+        description: Read a local demo note.
+        parameters:
+          - name: id
+            in: path
+            required: true
+            schema: { type: string, minLength: 1 }
+          - name: verbose
+            in: query
+            schema: { type: boolean }
+      - id: create
+        method: POST
+        path: /notes
+        requestBody:
+          required: true
+          schema:
+            type: object
+            properties:
+              title: { type: string, minLength: 1, maxLength: 200 }
+            required: [title]
+            additionalProperties: false
+tools:
+  - source: notes
+    operation: read
+    name: manual_get
+  - source: notes
+    operation: create
+    name: manual_create
+    description: Create a note in the local demo API.

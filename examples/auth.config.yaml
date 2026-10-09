@@ -1,0 +1,16 @@
+version: 1
+name: authenticated-demo
+sources:
+  - id: bearer
+    baseUrl: http://127.0.0.1:3001
+    auth: { type: bearer, env: DEMO_TOKEN }
+    endpoints:
+      - { id: check, method: GET, path: /auth/bearer }
+  - id: key
+    baseUrl: http://127.0.0.1:3001
+    auth: { type: apiKey, in: header, name: X-API-Key, env: DEMO_API_KEY }
+    endpoints:
+      - { id: check, method: GET, path: /auth/key }
+tools:
+  - { source: bearer, operation: check, name: bearer_check }
+  - { source: key, operation: check, name: api_key_check }

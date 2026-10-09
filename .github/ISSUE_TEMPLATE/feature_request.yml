@@ -1,0 +1,17 @@
+name: Feature request
+description: Propose a bounded improvement to the local API-to-MCP workflow
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Developer problem
+      description: What cannot you do in the current workflow?
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance example
+      description: A small input and observable result, plus why existing configuration cannot solve it.
+    validations:
+      required: true

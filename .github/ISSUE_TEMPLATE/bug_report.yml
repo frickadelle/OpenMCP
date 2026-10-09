@@ -1,0 +1,21 @@
+name: Bug report
+description: A reproducible CLI, API mapping or MCP client problem
+body:
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Include a synthetic config/spec and commands. Remove credentials and private data.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Node, OS, CLI version, client/version, validate and doctor results.

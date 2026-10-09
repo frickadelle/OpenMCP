@@ -1,0 +1,70 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { once } from 'node:events';
+import { writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { createDemoApi } from '../examples/api.js';
+import { loadConfig } from '../src/config.js';
+import { root, temp, exec, api, manual } from './helpers.js';
+import { exportClient, diagnose } from '../src/client.js';
+import { compileProject } from '../src/importer.js';
+
+for (const example of ['openapi', 'manual']) test(`SDK MCP client lists selected ${example} tools and calls read/write tools through stdio`, async t => {
+  const demo = createDemoApi(); demo.listen(0, '127.0.0.1'); await once(demo, 'listening');
+  t.after(() => new Promise(resolve => { demo.closeAllConnections(); demo.close(resolve); }));
+  const { config } = await loadConfig(join(root, `examples/${example}.config.yaml`));
+  config.sources[0].baseUrl = `http://127.0.0.1:${demo.address().port}`;
+  if (config.sources[0].spec) config.sources[0].spec = join(root, 'examples/openapi.yaml');
+  const dir = await temp(t); const path = join(dir, 'config.json'); await writeFile(path, JSON.stringify(config));
+  const entry = exportClient(path, config.name).mcpServers[config.name];
+  const transport = new StdioClientTransport({ ...entry, stderr: 'pipe' }); let logs = ''; transport.stderr.on('data', data => { logs += data; });
+  const client = new Client({ name: 'acceptance-test-client', version: '1' }); t.after(() => client.close());
+  await client.connect(transport);
+  const list = await client.listTools(); assert.deepEqual(list.tools.map(t => t.name), config.tools.map(t => t.name));
+  const read = await client.callTool({ name: config.tools[0].name, arguments: { path: { id: '1' }, query: { verbose: true } } });
+  assert(!read.isError); assert.equal(JSON.parse(read.content[0].text).title, 'Hello MCP');
+  const write = await client.callTool({ name: config.tools[1].name, arguments: { body: { title: 'Created through MCP' } } });
+  assert(!write.isError); assert.equal(JSON.parse(write.content[0].text).title, 'Created through MCP');
+  const invalid = await client.callTool({ name: config.tools[0].name, arguments: { path: { id: 5 } } }); assert.equal(invalid.isError, true);
+  const unknown = await client.callTool({ name: 'listNotes', arguments: {} }); assert.equal(unknown.isError, true);
+  assert.match(logs, /ready: 2 selected tools over stdio/); assert(!logs.includes('O P E N'));
+});
+test('real stdio authentication, secret redaction and safe error logs', async t => {
+  const server = await api(t, (req, res) => { const authorized = req.headers.authorization === 'Bearer synthetic-token'; res.writeHead(authorized ? 200 : 401, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ token: 'synthetic-token' })); });
+  const config = manual(); config.sources[0].baseUrl = server.baseUrl; config.sources[0].auth = { type: 'bearer', env: 'TEST_TOKEN' };
+  const dir = await temp(t); const path = join(dir, 'config.json'); await writeFile(path, JSON.stringify(config));
+  const transport = new StdioClientTransport({ ...exportClient(path, config.name).mcpServers[config.name], env: { TEST_TOKEN: 'synthetic-token' }, stderr: 'pipe' });
+  let logs = ''; transport.stderr.on('data', d => { logs += d; });
+  const client = new Client({ name: 'test', version: '1' }); t.after(() => client.close()); await client.connect(transport);
+  const result = await client.callTool({ name: 'read_item', arguments: { path: { id: '1' } } });
+  assert(!result.isError); assert(!result.content[0].text.includes('synthetic-token')); assert(!logs.includes('synthetic-token'));
+});
+test('doctor handshakes without network requests, probes reads and refuses writes', async t => {
+  const server = await api(t, (_req, res) => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{}'); });
+  const config = manual({ tools: [{ source: 'api', operation: 'read', name: 'read_item' }, { source: 'api', operation: 'create', name: 'create_item' }] }); config.sources[0].baseUrl = server.baseUrl;
+  const dir = await temp(t); const path = join(dir, 'config.json'); await writeFile(path, JSON.stringify(config));
+  const { selected } = await compileProject(config, dir);
+  const result = await diagnose(config, path, selected); assert.equal(result.tools.length, 2); assert.equal(server.requests.length, 0);
+  await diagnose(config, path, selected, { probe: 'read_item', args: { path: { id: '1' } } }); assert.equal(server.requests.length, 1);
+  await assert.rejects(diagnose(config, path, selected, { probe: 'create_item', args: { body: { title: 'No write' } } }), /GET\/HEAD/); assert.equal(server.requests.length, 1);
+});
+test('CLI export stdout is JSON, has absolute paths and never embeds secret values', async () => {
+  const { stdout, stderr } = await exec(process.execPath, [join(root, 'src/cli.js'), 'export', '-c', join(root, 'examples/auth.config.yaml')], { env: { ...process.env, DEMO_TOKEN: 'do-not-export', DEMO_API_KEY: 'do-not-export-key' } });
+  const config = JSON.parse(stdout); assert.equal(config.mcpServers['authenticated-demo'].command, process.execPath);
+  assert(config.mcpServers['authenticated-demo'].args.every((a, i) => i === 1 || i === 2 || a.startsWith('/')));
+  assert(!stdout.includes('do-not-export')); assert(!stderr.includes('do-not-export')); assert.match(stderr, /DEMO_TOKEN/);
+});
+test('CLI init/add/tool selection is explicit and invalid edits preserve configuration', async t => {
+  const dir = await temp(t); const file = join(dir, 'config.yaml');
+  const cli = args => exec(process.execPath, [join(root, 'src/cli.js'), ...args], { cwd: dir });
+  await cli(['init', '-c', file, '--name', 'sample', '--id', 'notes', '--spec', join(root, 'examples/openapi.yaml'), '--base-url', 'http://127.0.0.1:3001', '--auth', 'none', '--select', 'getNote']);
+  assert.equal((await loadConfig(file)).config.tools.length, 1);
+  await cli(['add', '-c', file, '--id', 'other', '--spec', join(root, 'examples/openapi.yaml'), '--base-url', 'http://127.0.0.1:3001', '--auth', 'none', '--select', 'createNote']);
+  const before = (await loadConfig(file)).config; assert.equal(before.sources.length, 2); assert.equal(before.tools.length, 2);
+  await assert.rejects(cli(['tools', '-c', file, '--select', 'notes/notReal'])); assert.deepEqual((await loadConfig(file)).config, before);
+  await cli(['tools', '-c', file, '--select', 'other/getNote']); assert.equal((await loadConfig(file)).config.tools[0].source, 'other');
+  await cli(['tools', '-c', file, '--select', '']); assert.equal((await loadConfig(file)).config.tools.length, 0);
+  await assert.rejects(cli(['init', '-c', file, '--name', 'new', '--id', 'notes', '--spec', join(root, 'examples/openapi.yaml'), '--base-url', 'http://127.0.0.1:3001', '--auth', 'none', '--select', 'getNote']));
+});

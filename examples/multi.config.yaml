@@ -1,0 +1,22 @@
+version: 1
+name: two-apis
+sources:
+  - id: catalog
+    baseUrl: http://127.0.0.1:3001
+    spec: openapi.yaml
+    auth: { type: none }
+  - id: internal
+    baseUrl: http://127.0.0.1:3001
+    auth: { type: none }
+    endpoints:
+      - id: health
+        method: GET
+        path: /health
+        description: Check the local demo API.
+tools:
+  - source: catalog
+    operation: getNote
+    name: catalog_get_note
+  - source: internal
+    operation: health
+    name: internal_health
