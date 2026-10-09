@@ -17,9 +17,9 @@
 ## P1 — improve current MVP
 
 4. **Detect installed MCP hosts and connect from the dashboard.** Next product
-   slice: list available Codex/OpenCode hosts and add a direct Connect action.
-   Clarify whether the requested "Cloud" target means Claude or a cloud runtime
-   before choosing that adapter. Use documented host configuration formats;
+   slice: list available Codex, Claude and OpenCode hosts and add a direct Connect
+   action. The requested "Cloud" target was clarified as Claude. Use documented
+   host configuration formats;
    detecting an application is not proof of MCP compatibility. Preserve existing
    servers/settings, create a recoverable backup and avoid secrets in config/logs.
    Done: each supported host has installation detection, connection setup,

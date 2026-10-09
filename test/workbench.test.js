@@ -6,7 +6,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { manual, temp, exec, root } from './helpers.js';
 import { discoverProjects, readProjects, readProject, toolsFor, sourceRows, toggleTool, updateSettings } from '../src/workbench-store.js';
-import { createViewState, frameLines, formFor, openToolPane, advanceBuild, moveSelection, listMouse } from '../src/workbench.js';
+import { createViewState, frameLines, formFor, openToolPane, advanceBuild, moveSelection, listMouse, quitKey } from '../src/workbench.js';
 import { compileProject } from '../src/importer.js';
 import { projectFileForName } from '../src/wizard.js';
 import { exportClient } from '../src/client.js';
@@ -45,7 +45,7 @@ test('enabling an unselected operation adds its definition without enabling othe
 });
 test('stale config and invalid settings leave disk unchanged', async t => {
   const p = await project(t); const changed = JSON.stringify({ ...p.config, name: 'edited-outside' }); await writeFile(p.path, changed);
-  await assert.rejects(toggleTool(p, 'api', 'read'), /ausserhalb/); assert.equal(await readFile(p.path, 'utf8'), changed);
+  await assert.rejects(toggleTool(p, 'api', 'read'), /outside/); assert.equal(await readFile(p.path, 'utf8'), changed);
   const fresh = await readProject(p.path);
   await assert.rejects(updateSettings(fresh, 'api', { baseUrl: 'https://user:password@example.com', auth: { type: 'none' }, timeoutMs: 1000 }), /credentials/);
   assert.equal(await readFile(p.path, 'utf8'), changed);
@@ -66,11 +66,11 @@ test('UI title stays fixed, supports small terminals and keeps Settings save vis
   state.progress = 1;
   const after = frameLines(state, 90, 28).find(l => l.text === state.rows[0].title);
   assert.equal(before.x, after.x); assert.equal(after.x, 2);
-  assert(frameLines(state, 40, 10).some(l => l.text.includes('vergroessern')));
+  assert(frameLines(state, 40, 10).some(l => l.text.includes('Resize')));
   state.mode = 'settings'; state.form = formFor(p, 'api', true);
   for (const height of [18, 24, 28, 40]) {
     const lines = frameLines(state, 80, height);
-    assert(lines.some(l => l.text.includes('Speichern') && l.y < height - 3));
+    assert(lines.some(l => l.text.includes('Save') && l.y < height - 3));
     assert(lines.every(l => l.y < height));
   }
   p.config.sources[0].id = 'malicious\x1b[2J';
@@ -78,7 +78,7 @@ test('UI title stays fixed, supports small terminals and keeps Settings save vis
 });
 test('no-argument launch refuses pipes without terminal control sequences', async () => {
   await assert.rejects(exec(process.execPath, [join(root, 'src/cli.js')]), error => {
-    assert.equal(error.stdout, ''); assert(!error.stderr.includes('\x1b')); assert.match(error.stderr, /interaktives Terminal/); return true;
+    assert.equal(error.stdout, ''); assert(!error.stderr.includes('\x1b')); assert.match(error.stderr, /interactive terminal/); return true;
   });
 });
 test('a restarted SDK MCP client cannot list or call a disabled tool', async t => {
@@ -107,7 +107,7 @@ test('ASCII panels and animated cards never overwrite another element, including
         assert(!cells.has(key), `overlap ${width}x${height} at progress ${progress}: ${key}`);
         cells.add(key);
       }
-      assert(lines.some(l => l.text.startsWith('+ DEINE MCPs')));
+      assert(lines.some(l => l.text.startsWith('+ YOUR MCPs')));
       assert(lines.some(l => l.text.startsWith('+ TOOLCALLS')));
       if (progress === 1) assert(lines.some(l => l.text === '[ ON ]'));
     }
@@ -119,17 +119,17 @@ test('ASCII panels and animated cards never overwrite another element, including
         const key = `${line.x + i},${line.y}`;
         assert(!cells.has(key), `settings overlap ${width}x${height}: ${key}`); cells.add(key);
       }
-      assert(lines.some(l => l.text.includes('[ Speichern ]')));
+      assert(lines.some(l => l.text.includes('[ Save ]')));
     }
   }
 });
-test('Enter or Right focuses tools once without restarting an existing animation or selection', () => {
-  const state = createViewState([]); openToolPane(state);
+test('Enter or Right focuses tools once without restarting an existing animation or selection', async t => {
+  const p = await project(t); const state = createViewState([p]); openToolPane(state);
   assert.equal(state.pane, 'tools'); assert.equal(state.progress, 1);
   state.progress = 0.72; state.tool = 3; openToolPane(state);
   assert.equal(state.progress, 0.72); assert.equal(state.tool, 3);
   state.progress = 1; openToolPane(state); assert.equal(state.progress, 1);
-  const still = createViewState([], false); openToolPane(still); assert.equal(still.progress, 1);
+  const still = createViewState([p], false); openToolPane(still); assert.equal(still.progress, 1);
 });
 
 test('tool frames build in place, then remain unchanged with no idle animation', async t => {
@@ -161,8 +161,7 @@ test('MCP list scrolls beyond the viewport and wheel targets the pane beneath th
   const lines = frameLines(state, 80, 24);
   assert(lines.some(l => l.text.includes('> project6')));
   assert(!lines.some(l => l.text.includes('project0')));
-  assert(lines.some(l => l.text.includes('7/7 | n: neu')));
-  assert.equal(moveSelection(state, 1), false);
+  assert(lines.some(l => l.text.includes('7/9 | n: new')));
   openToolPane(state);
   assert.equal(listMouse(state, 'MOUSE_WHEEL_UP', { x: 8, y: 10 }, 80, 24), true);
   assert.equal(state.pane, 'mcps'); assert.equal(state.row, 5);
@@ -174,12 +173,51 @@ test('MCP list scrolls beyond the viewport and wheel targets the pane beneath th
   state.mode = 'settings';
   assert.equal(listMouse(state, 'MOUSE_WHEEL_UP', { x: 8, y: 10 }, 80, 24), false);
 });
-test('single-entry MCP list stays bounded and explains how to create another project', async t => {
-  const state = createViewState([await project(t)], true);
-  assert.match(state.status, /Eine API-Quelle/);
-  assert.equal(moveSelection(state, 1), false); assert.equal(moveSelection(state, -1), false);
-  assert.equal(state.row, 0); assert.equal(state.progress, 1);
-  assert(frameLines(state, 80, 24).some(l => l.text.includes('1/1 | n: neu')));
+test('one project labels its API source and permits keyboard selection of setup and demo actions', async t => {
+  const config = manual({ name: 'test' }); config.sources[0].id = 'demo'; config.tools = [];
+  const p = await project(t, config); const state = createViewState([p], true);
+  assert.match(state.status, /One API source/);
+  assert(frameLines(state, 80, 24).some(l => l.text === 'API: demo'));
+  assert.equal(moveSelection(state, -1), false);
+  assert.equal(moveSelection(state, 1), true); assert.equal(state.rows[state.row].action, 'create');
+  assert.equal(moveSelection(state, 1), true); assert.equal(state.rows[state.row].action, 'demo');
+  assert.equal(moveSelection(state, 1), false);
+  openToolPane(state); assert.equal(state.pane, 'mcps');
+  const lines = frameLines(state, 80, 24);
+  assert(lines.some(l => l.text === '> Try local demo'));
+  assert(lines.some(l => l.text.includes('Enter: start setup')));
+  assert.equal(state.progress, 1);
+  assert.deepEqual((await readProject(p.path)).config, config);
+});
+
+test('quit confirmation defaults to cancel, isolates input and preserves the current view on cancellation', async t => {
+  const state = createViewState([await project(t)]); openToolPane(state); state.tool = 1;
+  const before = structuredClone(state);
+  assert.equal(quitKey(state, 'Q'), true); assert.equal(state.quit.confirm, false);
+  assert.equal(quitKey(state, 'ENTER'), true); assert.deepEqual(state, before);
+  quitKey(state, 'q');
+  assert.equal(listMouse(state, 'MOUSE_WHEEL_DOWN', { x: 8, y: 10 }, 80, 24), false);
+  quitKey(state, 's'); assert.equal(state.mode, 'browse');
+  assert.equal(advanceBuild(state), false);
+  quitKey(state, 'ESCAPE'); assert.deepEqual(state, before);
+  quitKey(state, 'q'); quitKey(state, 'RIGHT');
+  assert.equal(state.quit.confirm, true); assert.equal(quitKey(state, 'ENTER'), 'exit');
+  state.quit = undefined; quitKey(state, 'q'); assert.equal(quitKey(state, 'y'), 'exit');
+});
+
+test('quit popup renders English controls without overlapping frames at supported terminal sizes', async t => {
+  const state = createViewState([await project(t)]); quitKey(state, 'q');
+  for (const width of [64, 80, 100]) for (const height of [18, 24, 28]) {
+    const lines = frameLines(state, width, height);
+    assert(lines.some(l => l.text.includes('Do you really want to quit?')));
+    assert(lines.some(l => l.text.includes('> [ Cancel ]')));
+    const cells = new Set();
+    for (const line of lines) for (let i = 0; i < line.text.length; i++) {
+      const key = `${line.x + i},${line.y}`;
+      assert(line.x + i < width && line.y < height);
+      assert(!cells.has(key), `popup overlap at ${key}`); cells.add(key);
+    }
+  }
 });
 
 test('project name derives a discoverable unused config file without a filename prompt', async t => {
@@ -188,6 +226,6 @@ test('project name derives a discoverable unused config file without a filename 
   await writeFile(join(dir, 'test.yaml'), 'original');
   await writeFile(join(dir, 'test-2.yaml'), 'original');
   assert.equal(projectFileForName(dir, 'test'), join(dir, 'test-3.yaml'));
-  assert.throws(() => projectFileForName(dir, '../outside'), /kurzen Namen/);
+  assert.throws(() => projectFileForName(dir, '../outside'), /short name/);
   assert.equal(await readFile(join(dir, 'test.yaml'), 'utf8'), 'original');
 });

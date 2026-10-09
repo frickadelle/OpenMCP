@@ -9,9 +9,9 @@ test('tour explains all five steps without creating files or emitting stdout/ANS
   const { stdout, stderr } = await exec(process.execPath, [join(root, 'src/cli.js'), 'tour'], { cwd: dir });
   assert.equal(stdout, '');
   assert(!stderr.includes('\x1b'));
-  for (let step = 1; step <= 5; step++) assert(stderr.includes(`Schritt ${step}/5:`));
-  assert.match(stderr, /keine Datei/); assert.match(stderr, /ruft keine API auf/);
-  assert.match(stderr, /Umgebungsvariable/); assert.match(stderr, /Inspector/);
+  for (let step = 1; step <= 5; step++) assert(stderr.includes(`Step ${step}/5:`));
+  assert.match(stderr, /no files/); assert.match(stderr, /no API calls/);
+  assert.match(stderr, /environment variable/); assert.match(stderr, /Inspector/);
   assert.deepEqual(await readdir(dir), []);
 });
 
@@ -20,18 +20,18 @@ test('init explains actual next commands, selected tool names and the separate d
   const { stdout, stderr } = await exec(process.execPath, [join(root, 'src/cli.js'), 'init', '--config', join(dir, 'notes.yaml'),
     '--name', 'notes', '--id', 'demo', '--spec', join(root, 'examples/openapi.yaml'), '--base-url', 'http://127.0.0.1:3001', '--auth', 'none', '--select', 'getNote']);
   assert.equal(stdout, ''); assert(!stderr.includes('\x1b'));
-  assert.match(stderr, /ZWEITEN Terminal/); assert.match(stderr, /examples\/api.js/);
+  assert.match(stderr, /SECOND terminal/); assert.match(stderr, /examples\/api.js/);
   assert.match(stderr, /--probe demo_getNote/); assert.match(stderr, /--server notes/);
   assert.match(stderr, /--tool-name demo_getNote/);
-  assert.match(stderr, /noch nicht auf/);
+  assert.match(stderr, /does not call the API yet/);
 });
 
 test('overriding the example API URL does not suggest starting an unrelated local server', async t => {
   const dir = await temp(t);
   const { stderr } = await exec(process.execPath, [join(root, 'src/cli.js'), 'init', '--config', join(dir, 'remote.yaml'),
     '--name', 'remote', '--id', 'api', '--spec', join(root, 'examples/openapi.yaml'), '--base-url', 'https://api.example.test', '--auth', 'none', '--select', 'getNote']);
-  assert(!stderr.includes('examples/api.js')); assert(!stderr.includes('Port 3001'));
-  assert.match(stderr, /API erreichbar/);
+  assert(!stderr.includes('examples/api.js')); assert(!stderr.includes('port 3001'));
+  assert.match(stderr, /API is reachable/);
 });
 
 test('simple manual reading endpoint derives safe path inputs and rejects query/credentials in paths', async () => {
@@ -39,7 +39,7 @@ test('simple manual reading endpoint derives safe path inputs and rejects query/
   const endpoint = readingEndpoint('/notes/{id}/{id}');
   assert.equal(endpoint.method, 'GET');
   assert.deepEqual(endpoint.parameters, [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }]);
-  for (const path of ['https://example.com', '/notes?token=secret', '/notes#frag', '/has space', '/notes\\id']) assert.throws(() => readingEndpoint(path), /URL-Pfad/);
+  for (const path of ['https://example.com', '/notes?token=secret', '/notes#frag', '/has space', '/notes\\id']) assert.throws(() => readingEndpoint(path), /URL path/);
 });
 test('init without explicit file derives filename from name and retains configured source and selection', async t => {
   const dir = await temp(t);

@@ -2,47 +2,47 @@ import { setTimeout as pause } from 'node:timers/promises';
 
 export const animated = () => Boolean(process.stderr.isTTY && !process.env.OPEN_MCP_NO_ANIMATION && !process.env.CI && process.env.TERM !== 'dumb');
 const frames = ['[>    ]', '[=>   ]', '[==>  ]', '[===> ]', '[====>]', '[=====]'];
-const steps = ['API importieren', 'Tools auswaehlen', 'Zugang einstellen', 'Lokal starten', 'Client verbinden'];
+const steps = ['Import API', 'Choose tools', 'Set up auth', 'Start locally', 'Connect client'];
 const scenes = {
   import: [
     '  +----------------+       +-------------------+',
-    '  | API-Bauplan    |  ===> | Open MCP liest:    |',
-    '  | openapi.yaml   |       | GET  /notes/{id}   |',
-    '  | oder REST      |       | POST /notes       |',
+    '  | API spec       |  ===> | Open MCP reads:   |',
+    '  | openapi.yaml   |       | GET  /notes/{id}  |',
+    '  | or REST        |       | POST /notes       |',
     '  +----------------+       +-------------------+'
   ],
   tools: [
-    '  API kann viel. Du gibst einzelne Tools frei.',
+    '  Your API offers actions. Choose which to expose.',
     '  +--------------------+     +------------------+',
-    '  | [x] Notiz lesen    | ==> | demo_getNote     |',
-    '  | [x] Notiz anlegen  | ==> | demo_createNote  |',
-    '  | [ ] Notizen listen | -X- | bleibt verborgen |',
+    '  | [x] Read note      | ==> | demo_getNote     |',
+    '  | [x] Create note    | ==> | demo_createNote  |',
+    '  | [ ] List notes     | -X- | stays hidden     |',
     '  +--------------------+     +------------------+'
   ],
   auth: [
     '  +--------------------+     +------------------+',
-    '  | Deine Umgebung     | ==> | API-Anfrage      |',
-    '  | MY_API_TOKEN=***** |     | mit Zugang       |',
+    '  | Your environment   | ==> | API request      |',
+    '  | MY_API_TOKEN=***** |     | authenticated    |',
     '  +--------------------+     +------------------+',
     '            |                         ^',
-    '            +--- Konfig speichert ----+',
-    '                 nur den Variablennamen'
+    '            +--- config stores -------+',
+    '                 only the variable name'
   ],
   local: [
     '  +----------------+      +-------------------+',
-    '  | Deine Konfig   | ==> | Lokaler MCP-Server |',
-    '  | open-mcp.yaml  |     | prueft Eingaben    |',
-    '  +----------------+     | ruft deine API auf |',
+    '  | Your config    | ==> | Local MCP server  |',
+    '  | open-mcp.yaml  |     | validates inputs  |',
+    '  +----------------+     | calls your API    |',
     '                         +-------------------+',
-    '  Kein Cloud-Konto. Kein LLM-API-Key.'
+    '  No cloud account. No LLM API key.'
   ],
   client: [
     '  +----------+    +-----------+    +----------+',
-    '  | Client   | -> | Open MCP  | -> | Deine API|',
-    '  | ruft Tool|    | uebersetzt|    | antwortet|',
+    '  | Client   | -> | Open MCP  | -> | Your API |',
+    '  | calls    |    | maps      |    | responds |',
     '  +----------+    +-----------+    +----------+',
     '       ^                                |',
-    '       +---------- Ergebnis ------------+'
+    '       +---------- result --------------+'
   ]
 };
 export function explain(title, lines = []) {
@@ -51,7 +51,7 @@ export function explain(title, lines = []) {
   process.stderr.write('\n');
 }
 export async function chapter(index, title, lines, scene) {
-  explain(`Schritt ${index}/5: ${title}`, lines);
+  explain(`Step ${index}/5: ${title}`, lines);
   if (process.stderr.isTTY) {
     process.stderr.write(`  ${steps.map((s, i) => `${i + 1 < index ? '[x]' : i + 1 === index ? '[>]' : '[ ]'} ${i + 1}`).join(' --- ')}\n\n`);
   }
@@ -80,28 +80,28 @@ export async function ribbon(stage) {
   process.stderr.write('\n');
 }
 export async function revealTools(tools) {
-  explain(`${tools.length} Tools bewusst freigegeben`, ['Nur diese Namen sieht dein MCP-Client:']);
+  explain(`${tools.length} tools explicitly enabled`, ['Your MCP client sees only these names:']);
   for (const tool of tools) {
     process.stderr.write(`  [x] ${tool.name}\n      ${tool.operation}\n`);
     if (animated()) await pause(85);
   }
-  if (!tools.length) process.stderr.write('  Noch keine. Mit "tools --choose" kannst du sie spaeter auswaehlen.\n');
+  if (!tools.length) process.stderr.write('  None yet. Use "tools --choose" to select them later.\n');
 }
 export async function banner() {
   const lines = [
     '  +--------------------------------------------------+',
     '  |   O P E N   M C P  /  working title               |',
-    '  |   Deine HTTP-API wird zu Tools fuer einen Client. |',
+    '  |   Your HTTP API becomes tools for an MCP client. |',
     '  +--------------------------------------------------+'
   ];
   if (!process.stderr.isTTY) return;
   for (const line of lines) { process.stderr.write(`${line}\n`); if (animated()) await pause(65); }
-  explain('Was du hier baust', [
-    'Ein Tool ist eine Aktion, z.B. "Notiz lesen".',
-    'Open MCP verbindet diese Aktion mit deiner HTTP-API.',
-    'Du waehlst die erlaubten Aktionen. Eine Konfig speichert deine Auswahl.',
-    'Tastatur: Pfeile = navigieren, Leertaste = markieren, Enter = weiter.',
-    'Abbrechen: Ctrl+C. Animationen aus: OPEN_MCP_NO_ANIMATION=1.'
+  explain('What you are building', [
+    'A tool is an action, e.g. "Read a note".',
+    'Open MCP connects that action to your HTTP API.',
+    'You choose the allowed actions. A configuration stores your selection.',
+    'Keyboard: arrows navigate, Space selects, Enter continues.',
+    'Cancel: Ctrl+C. Disable animation: OPEN_MCP_NO_ANIMATION=1.'
   ]);
 }
 export async function busy(label, action) {

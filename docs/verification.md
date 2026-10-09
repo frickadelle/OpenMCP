@@ -5,6 +5,29 @@ The source repository is public on GitHub (visibility checked on 2026-10-09).
 No npm/package release has been made. Initial private-visibility evidence below
 records the status at that earlier checkpoint.
 
+## Menu navigation, English UI and quit confirmation
+
+- Diagnosed the reported singleton menu against the local source rows: one
+  `test` project with a `demo` API source, not two separately selectable projects.
+  Source labels now use `API: name`; New MCP and Try local demo are selectable
+  setup entries after configured sources.
+- `npm run check` and strict validation of all four examples passed. Full
+  regression: **77 passed, 0 failed, 0 skipped**. The initial sandbox run blocked
+  a loopback fixture; the successful run allowed local networking. Updated
+  pane-focus fixtures for the new action rows before the passing run.
+- Actual PTYs at **64x18, 80x24 and 100x28** traversed setup/demo with Down,
+  opened the popup using uppercase Q, cancelled with default Enter and Esc,
+  then selected Quit with Tab/Enter. Exit status was 0; fixture config bytes
+  remained unchanged. Keyboard and pointer input remain isolated by the popup.
+- An actual demo-menu PTY created `demo.yaml` after explicit tool selection,
+  returned to the refreshed dashboard and exercised tool focus/back/quit. No
+  credentials, API calls or user project mutations were needed.
+- Repeated all three English wizard PTY paths (OpenAPI file, manual GET with
+  bearer-variable name, and local demo), including validation feedback and the
+  optional client guide. All passed. English is the UI language; automatic OS
+  locale selection is not implemented. Source-provided tool descriptions retain
+  their original language.
+
 ## Pull request checkpoint
 
 - Integrated current `main` dependencies: Commander 15.0.0 and Inquirer prompts
