@@ -2,7 +2,8 @@
 
 Turn your own HTTP APIs into explicitly selected MCP tools. Import an API, select
 operations, configure environment-based auth, and let your MCP client start the
-local server. No server code generation, cloud account or LLM API key.
+local server. The local workflow needs no server code generation, cloud account
+or LLM API key. Optional self-hosting prepares a reusable HTTPS/domain package.
 
 ```text
  { OpenAPI / REST }
@@ -60,6 +61,7 @@ tools to MCP navigation. Dashboard, wizard and tour text use English.
 | Space | Enable/disable the selected tool and save its configuration |
 | `s` | Open source settings: base URL, auth, credential variable name, timeout |
 | `c` | Detect MCP hosts and configure the selected project's client connection |
+| `h` | Prepare a self-hosting package for your own domain and Docker server |
 | `r` | Reload project files after external edits |
 | `n` | Create another project through the wizard, then return to the dashboard |
 | `d` | Set up the local Notes demo, with explicit tool selection |
@@ -130,6 +132,27 @@ the host's environment before starting it. Claude Desktop direct setup currently
 supports public APIs only. OpenCode 1.x is supported; other versions are clearly
 rejected. macOS is the tested platform. See [host formats and verification
 boundaries](docs/hosts.md) for actual host proof and remaining limits.
+
+## Let others self-host on their domain
+
+Choose a project and press **h**. Enter a domain such as `mcp.your-domain.com`,
+provide a server-reachable API URL if your current API uses localhost, and choose
+a new folder. Open MCP prepares a portable Docker Compose package with a
+protected MCP HTTP endpoint, Caddy HTTPS and concrete setup/client instructions.
+The original project stays intact. No domain, DNS or hosting account is created.
+
+```sh
+openmcp deploy -c notes.yaml --domain mcp.your-domain.com --output notes-hosted
+# Copy notes-hosted to your Docker server and follow its README.
+```
+
+Users supply their domain/server, point DNS to it, set credential environment
+variables and run `docker compose up -d --build`. Caddy handles certificates
+after those prerequisites are met. Only the access token is needed on client
+machines; API keys stay on the server. Hosted registrations are separate from
+local registrations. The reusable package and authenticated SDK connection are
+tested with Docker and isolated HTTPS; public DNS/certificate issuance is not
+claimed tested. See [self-hosting guide](docs/self-hosting.md).
 
 ## Onboarding from the dashboard
 
@@ -287,6 +310,10 @@ The `examples/auth.config.yaml` example exercises bearer and header API-key auth
 | `serve` | Load configuration once and run MCP over stdio |
 | `doctor` | Check credentials; spawn and connect a real SDK MCP client; list tools |
 | `connect --list` / `connect --host ID` | Detect hosts or register the project in the selected host's user configuration |
+| `deploy` | Interactively prepare a transferable self-hosting package |
+| `deploy --domain NAME --output FOLDER` | Script package creation; `--api-url source=URL` overrides server API addresses |
+| `serve --transport http` | Authenticated SDK HTTP endpoint; requires `hosting` configuration and access-token env |
+| `bridge --url URL --token-env NAME` | SDK stdio adapter to an authenticated HTTPS MCP server |
 | `doctor --probe tool --args '{...}'` | Also call an explicitly named GET/HEAD tool |
 | `export --client inspector` | Print tested client JSON to stdout, with absolute paths |
 
@@ -401,11 +428,12 @@ response data are untrusted API content.
 
 ## Architecture and maintenance
 
-The official `@modelcontextprotocol/sdk` implements the protocol and stdio
+The official `@modelcontextprotocol/sdk` implements the protocol and stdio/HTTP
 transport. Swagger Parser validates OpenAPI and resolves local references. Ajv
 validates JSON Schemas and tool arguments. YAML, Commander and Inquirer provide
-file parsing and the CLI. Terminal Kit renders the dashboard and manages input. Node's built-in `fetch` sends requests; no HTTP service
-or database sits between the client and API.
+file parsing and the CLI. Terminal Kit renders the dashboard and manages input.
+Node's built-in `fetch` sends API requests. Optional self-hosting puts Caddy in
+front of the SDK HTTP endpoint; there is no hosted control plane or database.
 
 ```text
  cli / wizard ----> config ----> importer ----> selected operations

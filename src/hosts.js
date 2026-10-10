@@ -19,8 +19,8 @@ const plain = value => Array.isArray(value) ? value.map(plain) : object(value) &
 const same = (left, right) => isDeepStrictEqual(plain(left), plain(right));
 const exec = promisify(execFile);
 const versions = new Map();
-const requiredEnv = config => [...new Set(config.sources.filter(s => s.auth.type !== 'none').map(s => s.auth.env))];
-const serverName = config => `openmcp_${config.name}`;
+export const requiredHostEnv = config => config.hosting ? [config.hosting.tokenEnv] : [...new Set(config.sources.filter(s => s.auth.type !== 'none').map(s => s.auth.env))];
+const serverName = config => `${config.hosting ? 'openmcp_remote_' : 'openmcp_'}${config.name}`;
 async function exists(path) { try { await access(path); return true; } catch { return false; } }
 async function executable(name, env, platform) {
   for (const dir of (env.PATH ?? '').split(delimiter).filter(Boolean)) {
@@ -64,8 +64,8 @@ export async function hostTargets({ home = homedir(), env = process.env, platfor
   ];
 }
 export function hostEntry(host, configPath, config) {
-  const entry = exportClient(configPath, config.name).mcpServers[config.name];
-  const envs = requiredEnv(config);
+  const entry = exportClient(configPath, config.name, config.hosting).mcpServers[config.name];
+  const envs = requiredHostEnv(config);
   if (['claude-code', 'opencode'].includes(host.id)) {
     assert([entry.command, ...entry.args].every(value => !/\$\{|\{env:|\{file:/.test(value)), 'Host launch paths cannot contain environment interpolation markers. Move the checkout/config to a plain path.');
   }
@@ -73,7 +73,7 @@ export function hostEntry(host, configPath, config) {
   if (host.id === 'opencode') return { type: 'local', command: [entry.command, ...entry.args], enabled: true,
     ...(envs.length ? { environment: Object.fromEntries(envs.map(name => [name, `{env:${name}}`])) } : {}) };
   if (host.id === 'claude-desktop') {
-    assert(!envs.length, 'Claude Desktop setup currently supports public APIs only. Use Claude Code, Codex or OpenCode for environment-based authentication.');
+    assert(!envs.length, 'Claude Desktop setup currently supports public APIs only (local). Use Claude Code, Codex or OpenCode for authenticated remote connections.');
     return { command: entry.command, args: entry.args };
   }
   return { ...entry, ...(envs.length ? { env: Object.fromEntries(envs.map(name => [name, '${' + name + '}'])) } : {}) };

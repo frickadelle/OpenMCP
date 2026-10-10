@@ -10,6 +10,7 @@ const ident = { type: 'string', pattern: '^[a-zA-Z][a-zA-Z0-9_-]{0,63}$' };
 const object = (properties, required) => ({ type: 'object', properties, required, additionalProperties: false });
 export const configSchema = object({
   version: { const: 1 }, name: ident, timeoutMs: { type: 'integer', minimum: 1, maximum: 300000 },
+  hosting: object({ publicUrl: text, tokenEnv: { type: 'string', pattern: '^[A-Za-z_][A-Za-z0-9_]*$' } }, ['publicUrl', 'tokenEnv']),
   sources: { type: 'array', minItems: 1, items: object({
     id: ident, baseUrl: text, spec: text,
     auth: { oneOf: [object({ type: { const: 'none' } }, ['type']),
@@ -44,6 +45,11 @@ export async function readDocument(path) {
 }
 export function validateConfig(config) {
   validateData(check, config, 'Invalid configuration');
+  if (config.hosting) {
+    let url; try { url = new URL(config.hosting.publicUrl); } catch { throw new UserError('Hosting publicUrl must be an HTTPS /mcp URL.'); }
+    assert(url.protocol === 'https:' && !url.username && !url.password && !url.search && !url.hash && url.pathname === '/mcp', 'Hosting publicUrl must be HTTPS with /mcp and no credentials, query or fragment.');
+    assert(!config.sources.some(s => s.auth.env === config.hosting.tokenEnv), 'Hosting token variable must differ from API credential variables.');
+  }
   const ids = new Set();
   for (const source of config.sources) {
     assert(!ids.has(source.id), `Duplicate source id: ${source.id}.`); ids.add(source.id);

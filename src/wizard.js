@@ -6,7 +6,7 @@ import { catalogSource, compileProject, suggestedName } from './importer.js';
 import { readDocument, saveConfig } from './config.js';
 import { assert, UserError } from './errors.js';
 import { banner, ribbon, busy, chapter, explain, revealTools } from './ui.js';
-import { inspectHosts, connectHost } from './hosts.js';
+import { inspectHosts, connectHost, requiredHostEnv } from './hosts.js';
 
 export function projectFileForName(directory, name) {
   assert(/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(name), 'Enter a short name, e.g. my-api.');
@@ -271,7 +271,7 @@ export async function connectWizard(configPath, config) {
   const result = await connectHost(host, configPath);
   process.stderr.write(`\n  Configured for ${host.name}: ${result.name}\n  Restart ${host.name} to load your tools.\n`);
   if (result.backup) process.stderr.write(`  Previous settings saved to ${result.backup}\n`);
-  const envs = [...new Set(config.sources.filter(s => s.auth.type !== 'none').map(s => s.auth.env))];
+  const envs = requiredHostEnv(config);
   if (envs.length) process.stderr.write(`  Required in the host environment: ${envs.join(', ')}\n`);
   process.stderr.write('\n');
   return result;

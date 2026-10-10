@@ -5,6 +5,37 @@ The source repository is public on GitHub (visibility checked on 2026-10-09).
 No npm/package release has been made. Initial private-visibility evidence below
 records the status at that earlier checkpoint.
 
+## Portable self-hosting (2026-10-10)
+
+- Full regression: **92 passed, 0 failed, 0 skipped** with local networking.
+  Syntax and all four strict example validations passed. Focused self-host
+  regression also passed after adding HTTPS redirect-rejection proof.
+- Real SDK HTTP clients listed tools, rejected invalid/unselected input before
+  API effects, mapped path/query/body/bearer correctly and made one read and one
+  write without retries. Missing/wrong tokens, foreign Host/Origin, query tokens
+  and oversized request bodies were rejected. Health returned status only.
+- A real SDK stdio client used the authenticated HTTPS adapter with a temporary
+  trusted certificate. Backend API credentials were absent on the client; both
+  API and MCP tokens were redacted from returned text/logs. A redirect caused one
+  request and a clear failure, without following/repeating it.
+- `npm run test:deployment` passed using **Docker 29.8.2 / Compose 5.5.1**. It
+  validated the generated public-domain Caddyfile offline, then used a local
+  Caddy CA and random loopback port. Certificate-verified HTTPS, unauthorized
+  rejection, SDK list/read/write, remote stdio adapter and exactly two backend
+  calls passed. Test containers/volumes/application image were removed; system
+  trust, DNS and public certificates were untouched.
+- Actual 100x28 PTY: `h` opened setup, invalid domain and loopback API inputs
+  corrected in place, package created without changing the original config,
+  then returned to browsing/quit. Output-folder input now validates in place.
+- Generated bundles preserved manual/OpenAPI sources, disabled selections and
+  relative spec paths. Unrelated `.env` files were excluded, all injected values
+  remained env references, and existing output folders were refused. Container
+  COPY ownership permits the non-root runtime to read private snapshot files.
+- Initial fixture failures were incorrect content types, a forbidden Host header
+  dropped by Fetch and an undefined proxy header. Corrected fixtures used genuine
+  Node HTTP headers and text/JSON responses. Only passing corrected runs are
+  counted. The public DNS/ACME path and native remote host runtime remain untested.
+
 ## Direct host setup and time-based build
 
 - Full regression: **85 passed, 0 failed, 0 skipped** with local networking.

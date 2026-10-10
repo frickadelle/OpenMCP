@@ -6,28 +6,34 @@ import { credentials, callApi } from './http.js';
 import { redact, UserError } from './errors.js';
 
 export async function createServer(config, directory, env = process.env) {
+  return (await prepareServer(config, directory, env))();
+}
+export async function prepareServer(config, directory, env = process.env, extraSecrets = []) {
   const { selected } = await compileProject(config, directory);
   const secrets = credentials(config, env);
-  // Advanced SDK API preserves configurable JSON Schemas without translating them to function signatures.
-  const server = new Server({ name: config.name, version: '0.1.0' }, { capabilities: { tools: {} } });
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: selected.map(t => ({
-    name: t.name, description: t.description, inputSchema: t.inputSchema,
-    annotations: { readOnlyHint: ['GET', 'HEAD', 'OPTIONS'].includes(t.method),
-      destructiveHint: !['GET', 'HEAD', 'OPTIONS'].includes(t.method), openWorldHint: true }
-  })) }));
-  server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
-    const tool = selected.find(t => t.name === request.params.name);
-    try {
-      if (!tool) throw new UserError('Unknown or unselected tool. Run tools to review the allowlist.');
-      const text = await callApi(tool, request.params.arguments ?? {}, { secrets, timeoutMs: config.timeoutMs, signal: extra.signal });
-      return { content: [{ type: 'text', text }] };
-    } catch (error) {
-      const message = error instanceof UserError ? redact(error.message, [...secrets.values()]) : 'Unexpected request failure. Run doctor to check the configuration.';
-      process.stderr.write(`[${config.name}] ${message}\n`);
-      return { isError: true, content: [{ type: 'text', text: message }] };
-    }
-  });
-  return server;
+  for (const value of extraSecrets) secrets.set(Symbol('redaction'), value);
+  return () => {
+    // Advanced SDK API preserves configurable JSON Schemas without translating them to function signatures.
+    const server = new Server({ name: config.name, version: '0.1.0' }, { capabilities: { tools: {} } });
+    server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: selected.map(t => ({
+      name: t.name, description: t.description, inputSchema: t.inputSchema,
+      annotations: { readOnlyHint: ['GET', 'HEAD', 'OPTIONS'].includes(t.method),
+        destructiveHint: !['GET', 'HEAD', 'OPTIONS'].includes(t.method), openWorldHint: true }
+    })) }));
+    server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
+      const tool = selected.find(t => t.name === request.params.name);
+      try {
+        if (!tool) throw new UserError('Unknown or unselected tool. Run tools to review the allowlist.');
+        const text = await callApi(tool, request.params.arguments ?? {}, { secrets, timeoutMs: config.timeoutMs, signal: extra.signal });
+        return { content: [{ type: 'text', text }] };
+      } catch (error) {
+        const message = error instanceof UserError ? redact(error.message, [...secrets.values()]) : 'Unexpected request failure. Run doctor to check the configuration.';
+        process.stderr.write(`[${config.name}] ${message}\n`);
+        return { isError: true, content: [{ type: 'text', text: message }] };
+      }
+    });
+    return server;
+  };
 }
 export async function serve(config, directory) {
   const server = await createServer(config, directory);

@@ -6,8 +6,11 @@ import { runWorkbench } from './workbench.js';
 import { loadConfig, saveConfig, validateConfig } from './config.js';
 import { compileProject } from './importer.js';
 import { tour } from './tour.js';
+import { createDeployment, deployWizard } from './deploy.js';
+import { serveHttp } from './http-server.js';
+import { bridgeRemote } from './remote.js';
 import { initialize, addSource, selectTools, finishOnboarding, connectWizard } from './wizard.js';
-import { inspectHosts, connectHost } from './hosts.js';
+import { inspectHosts, connectHost, requiredHostEnv } from './hosts.js';
 import { serve } from './server.js';
 import { exportClient, diagnose } from './client.js';
 import { busy, ribbon } from './ui.js';
@@ -19,6 +22,11 @@ async function browse(options = {}) {
   let configs = options.config ? (Array.isArray(options.config) ? options.config : [options.config]) : [];
   while (true) {
     const action = await runWorkbench({ directory, configs });
+    if (action?.action === 'deploy') {
+      try { await deployWizard(action.configPath); await import('@inquirer/prompts').then(({ input }) => input({ message: 'Press Enter to return to the MCP overview' })); }
+      catch (error) { if (error.name !== 'ExitPromptError') throw error; }
+      continue;
+    }
     if (!['create', 'demo'].includes(action?.action)) return;
     let path;
     try {
@@ -77,9 +85,31 @@ configOption(program.command('validate').description('Validate configuration, Op
     assert(!options.strict || unsupported.length === 0, `${unsupported.length} unsupported operations; review or remove them.`);
     console.log(`Valid: ${config.sources.length} sources, ${selected.length} selected tools, ${unsupported.length} unsupported operations.`);
   });
-configOption(program.command('serve').description('Run MCP over stdio (stdout is protocol only)')).action(async options => {
-  const { config, directory } = await loadConfig(options.config); await serve(config, directory);
-});
+configOption(program.command('serve').description('Run MCP locally over stdio or authenticated HTTP'))
+  .option('--transport <transport>', 'stdio or http', 'stdio').option('--host <host>', 'HTTP bind address', '127.0.0.1')
+  .option('--port <port>', 'HTTP port', '3000').action(async options => {
+    const { config, directory } = await loadConfig(options.config);
+    assert(['stdio', 'http'].includes(options.transport), 'Transport must be stdio or http.');
+    if (options.transport === 'http') await serveHttp(config, directory, { host: options.host, port: Number(options.port) });
+    else await serve(config, directory);
+  });
+program.command('bridge').description('Authenticated HTTPS MCP as a local stdio client connection')
+  .requiredOption('--url <url>', 'HTTPS /mcp endpoint').option('--token-env <name>', 'Access-token environment variable', 'OPEN_MCP_ACCESS_TOKEN')
+  .action(options => bridgeRemote(options.url, options.tokenEnv));
+configOption(program.command('deploy').description('Create a reusable Docker/HTTPS self-hosting package'))
+  .option('--domain <domain>', 'Public domain, without protocol/path').option('--output <folder>', 'New output folder')
+  .option('--token-env <name>', 'Access-token variable name', 'OPEN_MCP_ACCESS_TOKEN')
+  .option('--api-url <source=url...>', 'API address reachable from the hosting server')
+  .action(async options => {
+    if (!options.domain) { await deployWizard(options.config); return; }
+    const apiUrls = Object.create(null);
+    for (const value of options.apiUrl ?? []) {
+      const equals = value.indexOf('='); assert(equals > 0, '--api-url must use source=URL.');
+      apiUrls[value.slice(0, equals)] = value.slice(equals + 1);
+    }
+    const result = await createDeployment(options.config, { domain: options.domain, output: options.output, tokenEnv: options.tokenEnv, apiUrls });
+    console.log(`Prepared ${result.directory}\nEndpoint: ${result.config.hosting.publicUrl}\nFollow the generated README for DNS, environment variables and Docker Compose.`);
+  });
 configOption(program.command('connect').description('Detect local MCP hosts and configure the selected client'))
   .option('--list', 'List detected hosts and configuration status without changing files')
   .option('--host <id>', 'Configure codex, claude-code, claude-desktop or opencode')
@@ -93,7 +123,7 @@ configOption(program.command('connect').description('Detect local MCP hosts and 
     const result = await connectHost(host, path);
     console.log(`Configured ${result.name} for ${host.name}. Restart the host to load tools.`);
     if (result.backup) console.log(`Backup: ${result.backup}`);
-    const envs = [...new Set(config.sources.filter(s => s.auth.type !== 'none').map(s => s.auth.env))];
+    const envs = requiredHostEnv(config);
     if (envs.length) console.log(`Required in the host environment: ${envs.join(', ')}.`);
   });
 configOption(program.command('doctor').description('Check credentials and a real local MCP connection'))
@@ -102,16 +132,16 @@ configOption(program.command('doctor').description('Check credentials and a real
     const { config, path, directory } = await loadConfig(options.config); const { selected } = await compileProject(config, directory);
     let args; try { args = JSON.parse(options.args); } catch { throw new UserError('--args must be valid JSON.'); }
     const result = await busy('Connect local MCP client', () => diagnose(config, path, selected, { probe: options.probe, args }));
-    console.log(`OK: Node ${process.versions.node}; credentials present; MCP connected; ${result.tools.length} tools listed.`);
+    console.log(`OK: Node ${process.versions.node}; credentials present; ${config.hosting ? 'remote' : 'local'} MCP connected; ${result.tools.length} tools listed.`);
     console.log(result.apiProbed ? `API probe succeeded: ${result.apiProbed}.` : 'API reachability was not probed. Use --probe <GET/HEAD tool> --args <json> to test it.');
   });
 configOption(program.command('export').description('Export tested MCP Inspector 2.10.1 configuration; no secret values'))
   .option('--client <client>', 'Client target', 'inspector').action(async options => {
     assert(options.client === 'inspector', 'Only the tested inspector client is supported.');
     const { config, path, directory } = await loadConfig(options.config); await compileProject(config, directory);
-    const envs = [...new Set(config.sources.filter(s => s.auth.type !== 'none').map(s => s.auth.env))];
+    const envs = requiredHostEnv(config);
     if (envs.length) process.stderr.write(`Required runtime environment variables: ${envs.join(', ')}. Pass them using Inspector -e NAME=value; export never includes values. See README.\n`);
-    console.log(JSON.stringify(exportClient(path, config.name), null, 2));
+    console.log(JSON.stringify(exportClient(path, config.name, config.hosting), null, 2));
   });
 try { await program.parseAsync(); }
 catch (error) {
@@ -120,6 +150,7 @@ catch (error) {
   let values = [];
   try { const index = process.argv.findIndex(a => ['--config', '-c'].includes(a));
     const { config } = await loadConfig(index >= 0 ? process.argv[index + 1] : 'open-mcp.yaml');
-    values = config.sources.filter(s => s.auth.type !== 'none').map(s => process.env[s.auth.env]); } catch {}
+    values = config.sources.filter(s => s.auth.type !== 'none').map(s => process.env[s.auth.env]);
+    if (config.hosting) values.push(process.env[config.hosting.tokenEnv]); } catch {}
   process.stderr.write(`Error: ${redact(message, values)}\n`); process.exitCode = 1;
 }

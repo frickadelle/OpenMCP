@@ -17,8 +17,9 @@
 | Responses | JSON and text, including empty/204 and application/*+json; at most 1 MiB | Binary/media outputs, streaming, output schema validation, automatic pagination; errors at call time for unsupported response types |
 | Reliability | Total timeout 1–300000 ms, default 10000; cancellation; no retries | No automatic retries for any method; no redirect following |
 | Dashboard | Local project/source discovery, persistent tool switches, source settings, host registration and session animation preference | No live request monitor, cross-process hot reload or global project registry |
-| MCP | Official SDK 1.32.1 stdio, list/call tools, advisory read/write annotations | Modern protocol era from SDK v2, HTTP transport, resources/prompts, OAuth, hot reload |
+| MCP | Official SDK 1.32.1 stdio and stateless JSON Streamable HTTP, list/call tools, advisory read/write annotations | Modern protocol era from SDK v2, resources/prompts, OAuth, SSE resumption, hot reload |
 | Client export | MCP Inspector 2.10.1 CLI, legacy protocol era | Desktop-client installation/testing; export contains absolute machine-specific paths and no credentials |
+| Self-hosting | Portable Docker/Caddy package, custom public domain, environment access token, Host/Origin checks, 1 MiB request body and 32 in-flight request bound, SDK HTTPS/stdio adapter | Domain purchase/DNS/cloud provisioning, public ACME proof, per-user auth, MCP OAuth discovery and browser connector automation |
 
 Descriptions/default/examples are metadata, not request values. Unsupported
 schema keywords are never silently removed. Nullable scalar path/query/header
@@ -43,3 +44,10 @@ Simple onboarding needs a local OpenAPI file or a documented API address and
 GET path. It does not discover endpoints from a website, infer body/query types
 from response samples, or use an LLM. The full manual configuration and `add`
 wizard remain available for more complex requests.
+
+Hosted configs add an optional `hosting` URL/token-variable binding. Clients
+use its HTTPS adapter and need only the access token; the server retains API
+credentials. Local and remote host registrations have distinct names. Shared
+tokens cover all selected tools in that project and require a trusted operator.
+Configuration changes need restart/rebuild. Bundles are versioned snapshots,
+not hot-synchronized copies of the source project. See `self-hosting.md`.

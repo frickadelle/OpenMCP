@@ -24,6 +24,7 @@ Focused checks:
 node --test test/mapping.test.js test/config-import.test.js
 npm run test:client
 npm run test:hosts:installed # optional; installed Codex CLI required, isolated profiles
+npm run test:deployment # Docker/Caddy; isolated TLS CA and loopback port
 node src/cli.js validate --strict -c examples/openapi.config.yaml
 node src/cli.js validate --strict -c examples/manual.config.yaml
 ```

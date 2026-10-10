@@ -24,3 +24,13 @@ jobs:
       - run: node src/cli.js validate --strict -c examples/manual.config.yaml
       - run: node src/cli.js validate --strict -c examples/multi.config.yaml
       - run: node src/cli.js validate --strict -c examples/auth.config.yaml
+  self-host:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run test:deployment
